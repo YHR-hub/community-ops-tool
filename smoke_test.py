@@ -439,6 +439,37 @@ def main():
         assert before_r >= 0
     check("转待办写库且幂等", agent_commit_actions_idempotent)
 
+    # ── v4.3 排查修复项 ──
+    def briefing_runs_off_main_thread():
+        """早报按钮必须走线程：同步调 LLM（45s）会把窗口冻住。"""
+        import time
+        t0 = time.time()
+        app._open_briefing()
+        elapsed = time.time() - t0
+        assert elapsed < 2.0, f"早报按钮应是异步的，却阻塞了 {elapsed:.1f}s"
+        # 驱动主线程处理 after 回调，确认线程→主线程的回传不抛异常
+        for _ in range(25):
+            app.update()
+            time.sleep(0.02)
+    check("早报按钮非阻塞（异步生成）", briefing_runs_off_main_thread)
+
+    def db_read_error_is_visible():
+        """读失败不能伪装成空结果：错误要落快照，供日志与自检读取。"""
+        assert db.query("SELECT * FROM 不存在的表") == []
+        snap = db.last_error()
+        assert snap and "不存在的表" in snap["sql"], "读失败应留下快照"
+        assert snap["err"]
+        # 成功查询后快照清空，避免陈旧的失败痕迹误导后续排查
+        db.query("SELECT 1")
+        assert db.last_error() is None, "读成功后应清掉上一次失败快照"
+    check("读失败留痕而非伪装空结果", db_read_error_is_visible)
+
+    def foreign_keys_enabled():
+        """外键开关要真的打开（否则级联删除只是纸面配置）。"""
+        row = db.query("PRAGMA foreign_keys", one=True)
+        assert row and row[0] == 1, f"外键未启用：{row}"
+    check("SQLite 外键已启用", foreign_keys_enabled)
+
     print("\n=== 9. AI 离线兜底（不配 Key）===")
     def offline_ai():
         app._analysis_tab = "ai"

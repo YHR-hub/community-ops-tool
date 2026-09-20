@@ -57,18 +57,46 @@ def get_conn():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
+    # v4.3：打开外键约束（SQLite 默认关闭）。删版本时子表级联清理，
+    # 不留孤儿数据。旧库的表没有 FK 定义，此 PRAGMA 对其无副作用。
+    conn.execute("PRAGMA foreign_keys=ON")
     conn.execute("PRAGMA busy_timeout=5000")
     return conn
 
 
+# v4.3：读失败要「看得见」。
+# 旧实现出错时返回 [] / None，和「查到 0 行」长得一模一样 ——
+# 查询报错时界面显示的是「暂无数据」空态，排障方向直接被带偏。
+# （db.py 顶部注释批判过「写入失败假成功」，读路径上的同类问题一直没堵。）
+# 返回类型保持不变（避免动到 81 项测试的既有断言），
+# 改为把最后一次读错误存快照，供日志与自检读取。
+_LAST_READ_ERROR = None
+
+
+def last_error():
+    """返回最近一次读失败的快照 dict（sql/err/at），无失败返回 None。"""
+    return _LAST_READ_ERROR
+
+
 def query(sql, params=(), one=False):
-    """只读查询封装。失败时返回空结果并打印真实异常。"""
+    """只读查询封装。失败时返回空结果，但错误会落日志 + 存快照。"""
+    global _LAST_READ_ERROR
     try:
         with get_conn() as c:
             cur = c.execute(sql, params)
-            return cur.fetchone() if one else cur.fetchall()
+            rows = cur.fetchone() if one else cur.fetchall()
+        _LAST_READ_ERROR = None      # 这次读成功了，清掉上一次的失败痕迹
+        return rows
     except sqlite3.Error as e:
         _log_db_error("query", sql, e)
+        import datetime
+        _LAST_READ_ERROR = {
+            "sql": sql[:200],
+            "err": str(e),
+            "at": datetime.datetime.now().strftime("%m-%d %H:%M:%S"),
+        }
+        from logger_setup import get_logger
+        get_logger().error("读失败(伪装成空结果风险) sql=%s err=%s", sql[:120], e)
         return None if one else []
 
 
@@ -134,7 +162,7 @@ CREATE TABLE IF NOT EXISTS events (
 
 CREATE TABLE IF NOT EXISTS checklists (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    version_id INTEGER,
+    version_id INTEGER REFERENCES versions(id) ON DELETE CASCADE,
     task       TEXT NOT NULL,
     category   TEXT DEFAULT '常规',
     assignee   TEXT DEFAULT '',
@@ -164,7 +192,7 @@ CREATE TABLE IF NOT EXISTS activity_log (
 
 CREATE TABLE IF NOT EXISTS budgets (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    version_id INTEGER NOT NULL,
+    version_id INTEGER NOT NULL REFERENCES versions(id) ON DELETE CASCADE,
     category   TEXT NOT NULL,
     item_name  TEXT NOT NULL,
     planned    REAL DEFAULT 0,
@@ -174,7 +202,7 @@ CREATE TABLE IF NOT EXISTS budgets (
 
 CREATE TABLE IF NOT EXISTS risks (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    version_id  INTEGER NOT NULL,
+    version_id  INTEGER NOT NULL REFERENCES versions(id) ON DELETE CASCADE,
     title       TEXT NOT NULL,
     probability TEXT DEFAULT 'medium',
     impact      TEXT DEFAULT 'medium',

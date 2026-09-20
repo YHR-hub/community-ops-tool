@@ -357,7 +357,8 @@ class OverviewMixin:
         bar = charts.ProgressBar(card.body, height=6,
                                  color=SUCCESS if pct == 100 else PRIMARY)
         bar.pack(fill="x", padx=SP_LG, pady=(0, SP_SM))
-        bar.after(30, lambda: bar.set(pct))
+        # 与 analysis 页保持一致：回调前确认组件还在（切页时可能已被销毁）
+        bar.after(30, lambda: bar.set(pct) if bar.winfo_exists() else None)
 
         # 分类进度
         from db import query
@@ -447,14 +448,42 @@ class OverviewMixin:
     #  今日早报（v4.2 智能体，逻辑在 agent.py）
     # ═══════════════════════════════════════════════════════
     def _open_briefing(self):
+        """
+        早报按钮 —— 必须走线程。
+
+        v4.3 修的真 bug：这里原本直接在主线程调 generate()，
+        而 generate 在配置了 API Key 时会同步请求 LLM（timeout 45s），
+        等于把整个窗口冻住 45 秒 —— 点了按钮像死机一样。
+        analysis 页的 AI 建议早就用了线程，这条路径漏了。
+        现在：线程里生成 → after(0) 回主线程渲染 → 回调里检查窗口还在不在。
+        """
+        import threading
+
         import agent as ops_agent
-        try:
-            b = ops_agent.generate()
-        except Exception as e:
-            self.toast(f"早报生成失败：{e}", DANGER)
+        self.toast("早报生成中…")
+
+        def worker():
+            try:
+                b = ops_agent.generate()
+            except Exception as e:      # noqa: BLE001（线程里只能兜住再回传）
+                err = str(e)
+                self.after(0, lambda: self._on_briefing_failed(err))
+                return
+            self.after(0, lambda: self._on_briefing_ready(b))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_briefing_ready(self, b):
+        """主线程回调：窗口可能已在等待期间被关掉，先确认还活着。"""
+        if not self.winfo_exists():
             return
         self.log("生成今日早报")
         self._show_briefing(b)
+
+    def _on_briefing_failed(self, err):
+        if not self.winfo_exists():
+            return
+        self.toast(f"早报生成失败：{err}", DANGER)
 
     def _show_briefing(self, b):
         """早报抽屉：结论 → 正文 → 预警 → 建议动作（可转待办）→ 决策轨迹。"""

@@ -676,7 +676,10 @@ class AnalysisMixin:
                 elif not token:
                     result += "\n\n———\n（未配置 API Key，以上为离线建议。填入 Key 后可获得针对你数据的分析。）"
 
-            self.after(0, lambda: self._on_ai_done(result, error))
+            # 窗口可能在这 45 秒里被关掉：after 回调必须确认自己还活着，
+            # 否则会打在已销毁的组件上（main thread is not in main loop）
+            self.after(0, lambda: (self.winfo_exists()
+                                   and self._on_ai_done(result, error)))
 
         threading.Thread(target=worker, daemon=True).start()
     def _on_ai_done(self, result, error=None):

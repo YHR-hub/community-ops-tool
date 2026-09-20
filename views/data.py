@@ -34,7 +34,7 @@ import components as C
 import charts
 import db
 from db import (
-    GAMES, query, execute, get_versions, top_characters,
+    GAMES, query, execute, get_versions, top_characters, latest_version,
     date_str, safe_int, safe_float, valid_date,
 )
 
@@ -538,9 +538,16 @@ class DataMixin:
         rows = top_characters(ver, 8) if ver and ver != "—" else []
 
         if not rows:
+            # v4.3：说清楚「为什么没有」——历史版本没统计过使用率是常见情况，
+            # 干巴巴一句「还没有数据」会让人以为是坏了。
+            live = latest_version()
+            live_ver = live["version"] if live else None
+            tip = ("使用率统计只覆盖当前版本与上一版本；"
+                   f"{ver} 不在统计范围内属正常"
+                   if ver and ver != live_ver else
+                   "可在「版本」页导入，或使用 seed_demo.py 生成演示数据")
             C.EmptyState(host, f"{ver} 还没有角色使用率数据", "star",
-                         "可在「版本」页导入，或使用 seed_demo.py 生成演示数据",
-                         height=120).pack(fill="x")
+                         tip, height=120).pack(fill="x")
             return
 
         chart = charts.BarChart(host, height=min(170, 24 * len(rows) + 20),

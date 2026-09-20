@@ -507,7 +507,9 @@ class ReportMixin:
                 result = self._local_deepen(base_text)
                 result += ("\n\n---\n_（未配置 API Key，以上为本地规则生成的深化版本。"
                            "填入 Key 后可获得真正的语义改写。）_")
-                self.after(0, lambda: self._on_ai_report(result, None))
+                # 同 analysis：回调前确认窗口还活着
+                self.after(0, lambda: (self.winfo_exists()
+                                       and self._on_ai_report(result, None)))
                 return
 
             base = load_config("ai_base_url", "https://api.deepseek.com")
@@ -520,12 +522,14 @@ class ReportMixin:
                     messages=[{"role": "user", "content": build()}],
                     temperature=0.6)
                 result = resp.choices[0].message.content
-                self.after(0, lambda: self._on_ai_report(result, None))
+                self.after(0, lambda: (self.winfo_exists()
+                                       and self._on_ai_report(result, None)))
             except Exception as e:
                 err = str(e)[:110]
                 result = self._local_deepen(base_text)
                 result += f"\n\n---\n_（AI 调用失败，已降级为本地深化。原因：{err}）_"
-                self.after(0, lambda: self._on_ai_report(result, err))
+                self.after(0, lambda: (self.winfo_exists()
+                                       and self._on_ai_report(result, err)))
 
         threading.Thread(target=worker, daemon=True).start()
 
