@@ -93,11 +93,21 @@ def seed(force=False):
     prev_start = today - timedelta(days=54)
     cur_start = today - timedelta(days=12)
 
+    # 4.3（closed）：真实版本「沉于生者的忘川」——千冶·刃SP回归、二相乐园篇章
+    v43_start = prev_start - timedelta(days=44)
+    db.execute(
+        "INSERT INTO versions (game,version,start_date,end_date,status,highlights,notes) "
+        "VALUES (?,?,?,?,?,?,?)",
+        (GAME, "4.3", str(v43_start), str(v43_start + timedelta(days=44)),
+         "closed", "千冶·刃SP回归，二相乐园篇章开启，复刻昔涟/白厄",
+         ""))
+    count += 1
+
     prev_id = db.execute(
         "INSERT INTO versions (game,version,start_date,end_date,status,highlights,notes) "
         "VALUES (?,?,?,?,?,?,?)",
         (GAME, PREV_VERSION, str(prev_start), str(prev_start + timedelta(days=42)),
-         "closed", "姬子·启行SP形态上线，二相乐园新篇章开启",
+         "closed", "姬子·启行SP上线，Fate/stay night联动开放，主线终章完结",
          "版本整体表现平稳，社区口碑正向"))
     count += 1
 
