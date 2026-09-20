@@ -26,6 +26,7 @@ from db import (
     anomaly_report, retention_stats, metrics_between, latest_version,
     date_str, days_ago, load_config, query, execute,
 )
+from logger_setup import get_logger
 
 # 与总览页 THRESHOLDS 保持一致：智能体不另立口径
 RET_DROP_PP = -1.5       # 次留 7 天均值环比跌幅（pp）→ 预警
@@ -394,6 +395,12 @@ def generate(use_ai=None):
                     f"{'⚠ ' if n_danger else ''}{len(alerts)} 项需要出手")
     else:
         headline = f"{ctx['game']} {ctx['version']} · 指标平稳，无需干预"
+
+    get_logger().info(
+        "早报生成：%s | 预警 %d 项(danger %d) | 动作 %d 项 | AI润色=%s | trace %d 步",
+        headline, len(alerts),
+        sum(1 for a in alerts if a["level"] == "danger"),
+        len(actions), ai_polished, len(trace))
 
     return {
         "ok": True,

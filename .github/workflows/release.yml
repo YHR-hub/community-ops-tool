@@ -1,0 +1,59 @@
+name: Release
+
+# tag 推送触发：git tag v4.3 && git push origin v4.3
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write      # 上传 Release 资产需要
+
+jobs:
+  build-exe:
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller customtkinter openai pillow
+
+      - name: Build single-file exe
+        run: |
+          pyinstaller --onefile --noconsole --name "米游社运营助手" `
+            --icon "icon.ico" `
+            --hidden-import "openai" --hidden-import "customtkinter" --hidden-import "PIL" `
+            --collect-data "customtkinter" --collect-submodules "customtkinter" `
+            --exclude-module torch --exclude-module torchaudio --exclude-module torchvision `
+            --exclude-module scipy --exclude-module matplotlib --exclude-module pandas `
+            main.py
+
+      - name: Smoke check the built exe
+        # 打包产物必须真的能启动：启动后 exe 旁会生成 data/ops_data.db
+        shell: pwsh
+        run: |
+          $exe = "dist\米游社运营助手.exe"
+          if (-not (Test-Path $exe)) { throw "打包产物缺失: $exe" }
+          $p = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 20
+          $db = Test-Path "dist\data\ops_data.db"
+          if ($p) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+          if (-not $db) { throw "exe 启动后未生成 data/ops_data.db（frozen 路径失效）" }
+          Write-Host "exe 冒烟通过"
+
+      - name: Create release with exe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" `
+            "dist/米游社运营助手.exe#米游社运营助手.exe (Windows 单文件，双击即用)" `
+            --title "${{ github.ref_name }}" `
+            --generate-notes

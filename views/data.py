@@ -39,22 +39,9 @@ from db import (
 )
 
 # CSV 表头 → 数据库列名。允许中文表头，降低使用门槛。
-CSV_ALIASES = {
-    "日期": "date", "date": "date",
-    "游戏": "game", "game": "game",
-    "dau": "dau", "活跃": "dau", "日活": "dau",
-    "新增用户": "new_users", "new_users": "new_users",
-    "帖子": "new_posts", "new_posts": "new_posts", "新增帖子": "new_posts",
-    "评论": "comments", "comments": "comments", "评论数": "comments",
-    "时长": "avg_session", "avg_session": "avg_session", "平均时长": "avg_session",
-    "互动率": "interaction_rate", "interaction_rate": "interaction_rate",
-    "次日留存": "retention_1", "次留": "retention_1", "retention_1": "retention_1",
-    "7日留存": "retention_7", "7留": "retention_7", "retention_7": "retention_7",
-    "30日留存": "retention_30", "30留": "retention_30", "retention_30": "retention_30",
-}
-
-REQUIRED_COLS = ["date", "game"]
-NUMERIC_COLS = ["dau", "new_posts", "comments", "avg_session", "interaction_rate"]
+# v4.3：权威定义迁到 data_source.py（数据源适配层），此处引用同一份，
+# 避免「UI 一套别名、数据源另一套别名」的漂移。
+from data_source import CSV_ALIASES, REQUIRED_COLS, NUMERIC_COLS  # noqa: F401
 
 METRIC_FIELDS = [
     ("dau", "DAU", "如 52000"),

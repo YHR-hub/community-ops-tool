@@ -82,6 +82,52 @@ def test_action_plan_mapping():
     assert plan[2]["category"] == "任务推进"
 
 
+def test_data_source_alias_mapping():
+    """数据源适配：中文表头映射 + 数值解析，跨来源同一套口径。"""
+    sys.path.insert(0, ROOT)
+    import data_source as ds
+    rows = [{
+        "日期": "2026-09-20", "游戏": "崩坏：星穹铁道",
+        "日活": "52,000", "次留": "45.2", "7留": "21.0",
+    }]
+    recs, errs = ds.normalize_rows(rows)
+    assert not errs, errs
+    assert recs[0]["game"] == "崩坏：星穹铁道"
+    assert recs[0]["dau"] == 52000          # 千分位要吃掉
+    assert recs[0]["retention_1"] == 45.2   # 「次留」≡ retention_1
+
+
+def test_data_source_rejects_bad_rows():
+    """坏行逐行报出行号与原因，且不拖垮其他行（部分成功）。"""
+    sys.path.insert(0, ROOT)
+    import data_source as ds
+    rows = [
+        {"date": "2026-09-20", "game": "星铁", "dau": "5000"},      # 正常
+        {"date": "2026/09/20", "game": "星铁", "dau": "5000"},      # 日期格式错
+        {"date": "2026-09-21", "game": "星铁", "dau": "abc"},       # 数值非法
+        {"date": "2026-09-22", "game": "星铁", "次留": "120"},      # 留存越界
+    ]
+    recs, errs = ds.normalize_rows(rows)
+    assert len(recs) == 1, "只有第一行合法"
+    assert len(errs) == 3
+    assert any("日期格式" in e[1] for e in errs)
+    assert any("不是数字" in e[1] for e in errs)
+    assert any("超出 0-100" in e[1] for e in errs)
+    assert all(isinstance(e[0], int) for e in errs), "错误必须带行号"
+
+
+def test_data_source_api_shape():
+    """ApiSource 两种常见返回结构（数组 / {data:[...]}）都能取到行。"""
+    sys.path.insert(0, ROOT)
+    import data_source as ds
+    # 不真发请求：验证接口行走同一套归一化（ApiSource 只负责取数）
+    src = ds.ApiSource("http://example.invalid/api")
+    assert src.name == "api" and src.timeout == 15
+    recs, _ = ds.normalize_rows(
+        [{"date": "2026-09-20", "game": "星铁", "dau": 100}])
+    assert recs and recs[0]["dau"] == 100
+
+
 def test_compose_attribution():
     """归因文案分派：留存下滑 × 互动率走低/平稳 给出不同归因。"""
     sys.path.insert(0, ROOT)

@@ -538,9 +538,16 @@ class App(OverviewMixin, DataMixin, VersionsMixin, AnalysisMixin, ReportMixin,
 
 
 def main():
+    import logger_setup
+    log = logger_setup.setup_logging()
+    log.info("=== 启动 v%s (frozen=%s) ===", APP_VERSION,
+             bool(getattr(sys, "frozen", False)))
     try:
         App().mainloop()
+        log.info("=== 正常退出 ===")
     except Exception:
+        # 崩溃必须有痕迹：用户只会说「它闪了一下」，日志是唯一的线索
+        log.exception("=== 未捕获异常，应用退出 ===")
         import traceback
         traceback.print_exc()
         sys.exit(1)

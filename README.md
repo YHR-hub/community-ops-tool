@@ -7,7 +7,7 @@
 [![CI](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tests](https://img.shields.io/badge/tests-74%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-81%20passing-brightgreen)
 
 **[⬇ 下载 exe（Windows，免安装）](https://github.com/YHR-hub/community-ops-tool/releases/latest)**
 
@@ -197,6 +197,60 @@ v4.1 之前，工具里的 AI 只扮演「顾问」（AI 问答、AI 润色报�
 测试基线 70 → **74 项**（smoke 40 + flow 34），新增智能体全链路结构、
 确定性造数异常捕获、纯函数归因分派（留存×互动率四种组合）与抽屉渲染用例；
 截图 13 → 14 张（新增 11_早报智能体）。
+
+## v4.3 工程加固：异动确认 · 早报闭环 · 质量基建
+
+v4.2 把「智能体」做出来了，v4.3 回答的是工程问题：**这些结论可信吗？能落地吗？代码能长期维护吗？**
+
+### ① 异动检测增加确认三维度（口径从「对冲节律」到「消除结构节律」）
+
+7 日均值只能对冲周期性，对冲不了节假日、版本活动这类非规则波动。
+所以每条异动现在带三个确认字段：
+
+| 字段 | 判据 | 含义 |
+|------|------|------|
+| `wow_change` / `confirmed` | \|同环比\| ≥ \|环比\| × 0.5 | 与上周同日比还有没有这个变化 |
+| `streak` | 连续同向天数 ≥ 2 | 真异动是趋势，误报是孤立点 |
+| `special` | 最近数据日是否落在活动期 | 活动期波动标记待人工复核 |
+
+分级 `level`：danger（已确认 + streak≥2）/ warn（已确认）/ watch（未确认，仅观察）。
+
+**这里踩过一个坑值得记**：第一版用「同环比方向是否同向」判断，
+写测试时发现它把「单日 DAU 腰斩」这类真异动也判成节律 —— 上周同日是正常值，
+方向当然同向。改成**幅度比例**才分得开。判据设计必须靠反例验证，不能拍脑袋。
+
+### ② 早报建议动作一键转待办（从「看到」到「闭环」）
+
+早报原来只读：给完建议就关掉。现在每条动作可一键转成待办——
+任务进 `checklists`、预算类风险进 `risks`，**同名条目幂等跳过**（重复点不堆积）。
+映射规则（这条算任务还是风险、几天内做完）写在 `agent.py` 而不是 UI：
+那是运营规则，规则就该在数据层，换界面照样成立。
+
+### ③ 数据源适配层（`data_source.py`）
+
+CSV 解析 + 列名映射 + 逐行校验原本全写在 `views/data.py` 里，
+结果就是只有 CSV 一条路能用。现在抽成数据源：
+`CsvSource`（文件，支持 GBK）/ `ApiSource`（HTTP JSON，真实 BI 出口）/
+`ManualSource`（表单），三种来源共用同一套别名与校验口径——
+接入新来源 = 加一个类，不动 UI、不动数据层。
+坏行逐行报出行号与原因，部分行失败不拖垮整批。
+
+### ④ 质量基建：ruff + pytest 适配层 + CI 三层 + Release 自动化
+
+- **ruff**：渐进策略（先只开 F/E4/E7/E9），清掉 87 处存量问题，CI 独立 lint job；
+- **pytest 适配层**（`tests/test_ops.py`）：既有脚本当整体用例跑（中文明细一条不丢），
+  另加 6 个纯逻辑用例秒级反馈——异动确认、动作映射、归因分派、数据源归一化；
+- **CI 三层**：`lint`（ubuntu）→ `fast-test`（ubuntu，秒级）→ `smoke-test`（Windows GUI 全量 81 项），
+  让 PR 上先红的永远是最快最便宜的那个；
+- **Release 自动化**：推送 `v*` tag 即触发打包 → exe 冒烟（确认 exe 旁生成 `data/ops_data.db`，
+  防止 onefile 路径 bug 复发）→ 自动建 Release 挂 exe；
+- **结构化日志**（`logger_setup.py`）：滚动文件落 exe 旁 `logs/`，只落本地不上报。
+- **主动没做覆盖率徽章**：测试跑在子进程统计不到，且 GUI 占比大数字失真 —— 宁缺勿假。
+
+### 明确不做的事
+
+架构重写。Mixin 分层在 9k 行规模是合理的，拆 repository/domain 层是过度设计，
+还会把已经跑通的 81 项测试全部打乱。
 
 ## v4.1 数据能力升级：留存分析 + 异动归因
 
