@@ -92,9 +92,26 @@ def seed(force=False):
     # ═══════════════════════════════════════════════
     prev_start = today - timedelta(days=54)
     cur_start = today - timedelta(days=12)
-
     # 4.3（closed）：真实版本「沉于生者的忘川」——千冶·刃SP回归、二相乐园篇章
     v43_start = prev_start - timedelta(days=44)
+
+    # 4.0 ~ 4.2（closed）：真实历史版本，让时间线有完整的 4.x 演进
+    # 4.0 爻光/火花双欢愉开幕 -> 4.1 不死途（官方公告「献给破晓的失控」）
+    # -> 4.2 银狼LV.999/绯英 -> 4.3 千冶·刃 -> 4.4 姬子·启行+Fate联动+主线终章 -> 4.5 双SP
+    HISTORICAL_VERSIONS = [
+        ("4.0", "爻光/火花双欢愉登场，4.x世代开幕"),
+        ("4.1", "不死途登场，二相乐园篇章推进"),
+        ("4.2", "银狼LV.999/绯英登场，欢愉体系扩充"),
+    ]
+    hist_start = v43_start - timedelta(days=40 * len(HISTORICAL_VERSIONS))
+    for ver, hl in HISTORICAL_VERSIONS:
+        db.execute(
+            "INSERT INTO versions (game,version,start_date,end_date,status,highlights,notes) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (GAME, ver, str(hist_start), str(hist_start + timedelta(days=40)),
+             "closed", hl, ""))
+        hist_start += timedelta(days=40)
+        count += 1
     db.execute(
         "INSERT INTO versions (game,version,start_date,end_date,status,highlights,notes) "
         "VALUES (?,?,?,?,?,?,?)",
