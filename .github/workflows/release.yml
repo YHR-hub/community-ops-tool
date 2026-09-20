@@ -49,11 +49,16 @@ jobs:
           if (-not $db) { throw "exe 启动后未生成 data/ops_data.db（frozen 路径失效）" }
           Write-Host "exe 冒烟通过"
 
+      - name: Rename artifact (ASCII-safe for upload)
+        # 中文文件名在 runner 的编码环境下会被 gh 弄成 default.exe，先改名规避
+        shell: pwsh
+        run: Copy-Item "dist\米游社运营助手.exe" "dist\MiyoOpsTool.exe"
+
       - name: Create release with exe
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ github.ref_name }}" `
-            "dist/米游社运营助手.exe#米游社运营助手.exe (Windows 单文件，双击即用)" `
-            --title "${{ github.ref_name }}" `
+            "dist/MiyoOpsTool.exe#米游社运营助手 (Windows 单文件，双击即用)" `
+            --title "${{ github.ref_name }} · 米游社运营助手" `
             --generate-notes
