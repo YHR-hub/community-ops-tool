@@ -390,6 +390,55 @@ def main():
         assert "暂无运营数据" in n3
     check("早报归因文案分派", agent_compose_attribution)
 
+    # ── v4.3 早报闭环：建议动作 → 待办 ──
+    def agent_action_plan_mapping():
+        import agent as ops_agent
+        plan = ops_agent.action_plan([
+            "排查近期内容话题热度与发帖质量，必要时补位话题活动",
+            "预算使用率已达 94%，可能超支",
+            "先清逾期任务，再排今日新工作",
+        ])
+        assert len(plan) == 3
+        by_text = {p["text"][:4]: p for p in plan}
+        # 关键词命中：话题 → 内容运营/任务；预算 → 风险；逾期 → 任务推进
+        assert by_text["排查近期"]["category"] == "内容运营"
+        assert by_text["排查近期"]["target"] == "task"
+        assert by_text["预算使用"]["target"] == "risk"
+        assert by_text["先清逾期"]["category"] == "任务推进"
+        assert all(p["days"] >= 1 for p in plan)
+    check("动作→待办的映射规则", agent_action_plan_mapping)
+
+    def agent_commit_actions_idempotent():
+        import agent as ops_agent
+        v = db.latest_version("崩坏：星穹铁道")
+        assert v, "演示库应有星铁版本"
+        acts = ["【测试】排查互动率话题热度", "【测试】预算超支风险复查"]
+        before_t = db.query(
+            "SELECT COUNT(*) c FROM checklists WHERE version_id=?",
+            (v["id"],), one=True)["c"]
+        before_r = db.query(
+            "SELECT COUNT(*) c FROM risks WHERE version_id=?",
+            (v["id"],), one=True)["c"]
+        try:
+            r1 = ops_agent.commit_actions(acts, version_id=v["id"])
+            assert r1["tasks"] == 1 and r1["risks"] == 1, r1
+            after_t = db.query(
+                "SELECT COUNT(*) c FROM checklists WHERE version_id=?",
+                (v["id"],), one=True)["c"]
+            assert after_t == before_t + 1
+            # 幂等：重复提交不堆积
+            r2 = ops_agent.commit_actions(acts, version_id=v["id"])
+            assert r2["tasks"] == 0 and r2["risks"] == 0 and r2["skipped"] == 2, r2
+            after_t2 = db.query(
+                "SELECT COUNT(*) c FROM checklists WHERE version_id=?",
+                (v["id"],), one=True)["c"]
+            assert after_t2 == before_t + 1, "重复转待办不应堆积"
+        finally:
+            db.execute("DELETE FROM checklists WHERE task LIKE '【测试】%'")
+            db.execute("DELETE FROM risks WHERE title LIKE '【测试】%'")
+        assert before_r >= 0
+    check("转待办写库且幂等", agent_commit_actions_idempotent)
+
     print("\n=== 9. AI 离线兜底（不配 Key）===")
     def offline_ai():
         app._analysis_tab = "ai"

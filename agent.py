@@ -24,7 +24,7 @@ from datetime import datetime
 
 from db import (
     anomaly_report, retention_stats, metrics_between, latest_version,
-    date_str, days_ago, load_config, query,
+    date_str, days_ago, load_config, query, execute,
 )
 
 # 与总览页 THRESHOLDS 保持一致：智能体不另立口径
@@ -132,6 +132,105 @@ def compose(ctx):
         act = ctx["actions"] if isinstance(ctx["actions"], list) else [ctx["actions"]]
         body += f"今日建议：{act[0]}。"
     return (head + body).strip()
+
+
+# 建议动作 → 结构化条目，供「一键转待办」使用。
+# 为什么单独做一层映射而不是让 UI 直接写库：
+#   「这条建议算任务还是风险、归到哪个类目、几天内做完」是运营规则，
+#   规则就应该在数据层，UI 只负责触发 —— 换一个界面也照样成立。
+ACTION_PLAN_RULES = [
+    # (关键词, 类目, 落库目标, 建议天数)
+    ("预算", "预算", "risk", 3),
+    ("超支", "预算", "risk", 3),
+    ("逾期", "任务推进", "task", 1),
+    ("清逾期", "任务推进", "task", 1),
+    ("互动率", "内容运营", "task", 2),
+    ("话题", "内容运营", "task", 2),
+    ("留存", "数据核查", "task", 2),
+    ("渠道", "数据核查", "task", 2),
+    ("投放", "数据核查", "task", 2),
+    ("DAU", "数据核查", "task", 2),
+]
+
+
+def action_plan(actions, game=None):
+    """
+    把建议动作文本映射成结构化条目（不写库，纯函数，方便测试）。
+
+    返回 list[dict]：text / category / target(task|risk) / days / owner。
+    """
+    out = []
+    for text in actions or []:
+        category, target, days = None, "task", 2
+        for kw, cat, tgt, dd in ACTION_PLAN_RULES:
+            if kw in text:
+                category, target, days = cat, tgt, dd
+                break
+        out.append({
+            "text": text,
+            "category": category or "运营跟进",
+            "target": target,
+            "days": days,
+            "owner": "",
+            "game": game,
+        })
+    return out
+
+
+def commit_actions(actions, game=None, version_id=None):
+    """
+    把建议动作写回业务表：任务进 checklists、风险进 risks —— 早报闭环。
+
+    幂等：同版本同名条目已存在则跳过（重复点「转待办」不会堆积）。
+    返回 dict：tasks / risks / skipped。
+    """
+    from datetime import timedelta
+
+    if not actions:
+        return {"tasks": 0, "risks": 0, "skipped": 0}
+
+    if version_id is None:
+        v = latest_version(game)
+        version_id = v["id"] if v else None
+    if version_id is None:
+        return {"tasks": 0, "risks": 0, "skipped": len(list(actions))}
+
+    plan = action_plan(actions, game)
+    today = datetime.strptime(date_str(), "%Y-%m-%d").date()
+    n_task = n_risk = n_skip = 0
+
+    for item in plan:
+        text = item["text"]
+        if item["target"] == "risk":
+            exists = query(
+                "SELECT id FROM risks WHERE version_id=? AND title=?",
+                (version_id, text), one=True)
+            if exists:
+                n_skip += 1
+                continue
+            execute(
+                "INSERT INTO risks (version_id,title,probability,impact,"
+                "mitigation,contingency,owner,status) "
+                "VALUES (?,?,'medium','medium',?,'',?,'open')",
+                (version_id, text, text, item["owner"] or "运营"))
+            n_risk += 1
+        else:
+            exists = query(
+                "SELECT id FROM checklists WHERE version_id=? AND task=?",
+                (version_id, text), one=True)
+            if exists:
+                n_skip += 1
+                continue
+            deadline = str(today + timedelta(days=item["days"]))
+            execute(
+                "INSERT INTO checklists "
+                "(version_id,task,category,assignee,deadline,status) "
+                "VALUES (?,?,?,?,?,'pending')",
+                (version_id, text, item["category"],
+                 item["owner"] or "", deadline))
+            n_task += 1
+
+    return {"tasks": n_task, "risks": n_risk, "skipped": n_skip}
 
 
 def _ai_polish(narrative, findings_text):
@@ -301,6 +400,8 @@ def generate(use_ai=None):
         "generated_at": datetime.now().strftime("%m-%d %H:%M"),
         "headline": headline,
         "has_data": has_data,
+        "game": ctx.get("game") or None,      # 供「转待办」定位版本
+        "version": ctx.get("version") or None,
         "alerts": alerts,
         "actions": actions,
         "trace": trace,

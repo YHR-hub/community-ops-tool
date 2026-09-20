@@ -16,8 +16,8 @@ import customtkinter as ctk
 
 import theme
 from theme import (
-    BG_CARD, BG_APP, BG_ELEVATED,
-    PRIMARY, DANGER, SUCCESS, WARNING, INFO, AI, NEUTRAL,
+    BG_CARD, BG_APP, BG_ELEVATED, BG_BORDER,
+    PRIMARY, PRIMARY_HOVER, DANGER, SUCCESS, WARNING, INFO, AI, NEUTRAL,
     TEXT_PRIMARY, TEXT_BODY, TEXT_SECONDARY, TEXT_TERTIARY,
     font, SIZE_H3, SIZE_BODY, SIZE_SMALL, SIZE_TINY,
     SP_XS, SP_SM, SP_MD, SP_LG, RADIUS_MD,
@@ -457,7 +457,8 @@ class OverviewMixin:
         self._show_briefing(b)
 
     def _show_briefing(self, b):
-        """早报抽屉：结论 → 正文 → 预警 → 建议动作 → 决策轨迹。"""
+        """早报抽屉：结论 → 正文 → 预警 → 建议动作（可转待办）→ 决策轨迹。"""
+        import agent as ops_agent
         LEVEL_COLOR = {"danger": DANGER, "warn": WARNING, "info": INFO}
 
         dlg = ctk.CTkToplevel(self)
@@ -506,15 +507,42 @@ class OverviewMixin:
                              text_color=TEXT_BODY, anchor="w", wraplength=520,
                              justify="left").pack(anchor="w")
 
-        # 建议动作
+        # 建议动作（可一键转待办 —— 早报从「看到」闭环到「有人跟进」）
         if b["actions"]:
-            ctk.CTkLabel(scroll, text="建议动作", font=font(SIZE_SMALL, bold=True),
-                         text_color=TEXT_SECONDARY, anchor="w").pack(
-                anchor="w", pady=(SP_SM, SP_XS))
+            act_head = ctk.CTkFrame(scroll, fg_color="transparent", height=1)
+            act_head.pack(fill="x", pady=(SP_SM, SP_XS))
+            ctk.CTkLabel(act_head, text="建议动作", font=font(SIZE_SMALL, bold=True),
+                         text_color=TEXT_SECONDARY, anchor="w").pack(side="left")
+
+            def _commit(selected=None):
+                # 闭环写库：任务进 checklists、风险进 risks（同名条目自动跳过）
+                acts = selected if selected is not None else b["actions"]
+                res = ops_agent.commit_actions(acts, game=b.get("game"))
+                done = res["tasks"] + res["risks"]
+                if done:
+                    self.toast(
+                        f"已转待办 {done} 项（任务 {res['tasks']} / 风险 {res['risks']}）")
+                    dlg.destroy()
+                    self._refresh()
+                else:
+                    self.toast("这些动作已在待办中，无需重复添加")
+
+            ctk.CTkButton(act_head, text="全部转待办", width=96, height=26,
+                          fg_color=PRIMARY, hover_color=PRIMARY_HOVER,
+                          font=font(SIZE_TINY), corner_radius=13,
+                          command=_commit).pack(side="right")
             for i, act in enumerate(b["actions"], 1):
-                ctk.CTkLabel(scroll, text=f"{i}. {act}", font=font(SIZE_SMALL),
-                             text_color=TEXT_BODY, anchor="w", wraplength=560,
-                             justify="left").pack(anchor="w", pady=(0, SP_XS))
+                row = ctk.CTkFrame(scroll, fg_color="transparent", height=1)
+                row.pack(fill="x", pady=(0, SP_XS))
+                ctk.CTkLabel(row, text=f"{i}. {act}", font=font(SIZE_SMALL),
+                             text_color=TEXT_BODY, anchor="w", wraplength=470,
+                             justify="left").pack(side="left", anchor="w")
+                ctk.CTkButton(row, text="转待办", width=58, height=24,
+                              fg_color=BG_ELEVATED, hover_color=BG_BORDER,
+                              text_color=TEXT_SECONDARY, font=font(SIZE_TINY),
+                              corner_radius=12,
+                              command=lambda a=act: _commit([a])).pack(
+                    side="right")
 
         # 决策轨迹（可解释性：智能体每一步为什么这么查，全在这里）
         trace = ctk.CTkFrame(scroll, fg_color=BG_CARD, corner_radius=RADIUS_MD)
