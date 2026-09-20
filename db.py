@@ -524,6 +524,119 @@ ANOMALY_RULES = [
     ("interaction_rate", "互动率", "pp", 0.5),
 ]
 
+# 同环比确认比例：|同环比| / |环比| 达到该比例才算真异动。
+# 低于它意味着「相对上周同日几乎没变」—— 是周期性低谷撞上 7 日均值基准。
+ANOMALY_CONFIRM_RATIO = 0.5
+
+# 连续确认：连续同向天数达到该值才算趋势（真异动是趋势，误报是孤立点）。
+ANOMALY_STREAK_MIN = 2
+
+
+def _mean_of(items, key):
+    vals = [r[key] for r in items if r[key] is not None]
+    return sum(vals) / len(vals) if vals else 0.0
+
+
+def _day_value(d, col, g):
+    """某一天某指标的当日值（多游戏时取均值，与 anomaly_report 口径一致）。"""
+    sql = "SELECT * FROM daily_metrics WHERE date=?"
+    params = [str(d)]
+    if g:
+        sql += " AND game=?"
+        params.append(g)
+    rows = query(sql, params)
+    vals = [r[col] for r in rows if r[col] is not None]
+    return sum(vals) / len(vals) if vals else None
+
+
+def _wow_check(d_last, col, mode, g, change):
+    """
+    同环比校验：最近数据日 vs 上周同一天（无数据顺延回退 1~2 天）。
+
+    为什么需要：7 日均值只能对冲「周期性」，对冲不了节假日、版本活动
+    这类非规则波动 —— 单日越线后隔天回落，多半是节律不是真异动。
+    同环比把「周末对周末、活动日对活动日」的对照补上。
+
+    判据是**幅度比例**而不是方向：
+      · 若 |同环比| >= |环比| × CONFIRM_RATIO → 确认为真异动；
+      · 若同环比幅度远小于环比 → 说明「相对上周同日几乎没变」，
+        这次越线只是周期性低谷撞上了 7 日均值基准 → 疑似节律误报。
+    举个反例说明为什么不能只看方向：单日 DAU 腰斩时，上周同日是正常值，
+    方向当然与环比同向（都是跌），但那是真异动、不是节律 ——
+    方向判断会把节律误报和真异动都判成「确认」，只有幅度比能分开。
+    上周同日无数据时无法证伪，按「不降级」处理（漏报代价 > 误报代价）。
+    """
+    for back in (7, 8, 9):
+        d = str(d_last - timedelta(days=back))
+        wow = _day_value(d, col, g)
+        cur = _day_value(str(d_last), col, g)
+        if wow is None or cur is None or wow == 0:
+            continue
+        if mode == "pct":
+            diff = (cur - wow) / wow * 100
+            txt = f"{diff:+.1f}%"
+        else:
+            diff = cur - wow
+            txt = f"{diff:+.2f}pp"
+        confirmed = abs(diff) >= abs(change) * ANOMALY_CONFIRM_RATIO
+        return txt, confirmed
+    return "", True
+
+
+def _streak_days(d_last, col, base_days, g, change):
+    """
+    连续确认：往回数连续多少天「当日 vs 该日前 base_days 日均值」与当日同向。
+
+    真异动是趋势（连续多天同向），节律误报是孤立点（单日越线后回落）。
+    streak>=2 说明不是单点噪声。最多回溯 5 天，够用且开销可控。
+    """
+    if not change:
+        return 0
+    sign = change > 0
+    streak = 0
+    for k in range(1, 6):
+        d = d_last - timedelta(days=k)
+        cur_d = _day_value(str(d), col, g)
+        if cur_d is None:
+            break
+        base_rows = _rows_between(d - timedelta(days=base_days),
+                                  d - timedelta(days=1), g)
+        if not base_rows:
+            break
+        base_v = _mean_of(base_rows, col)
+        if base_v == 0:
+            break
+        diff = (cur_d - base_v) / base_v * 100 if base_v else 0
+        if (diff > 0) != sign:
+            break
+        streak += 1
+    return streak
+
+
+def _rows_between(start_d, end_d, g):
+    sql = "SELECT * FROM daily_metrics WHERE date>=? AND date<=?"
+    params = [str(start_d), str(end_d)]
+    if g:
+        sql += " AND game=?"
+        params.append(g)
+    return query(sql, params)
+
+
+def _in_event_window(day, g=None):
+    """
+    活动日标记：最近数据日是否落在某个活动区间内。
+
+    活动期内的波动是「预期内的波动」—— 版本活动、联动、前瞻预约都会
+    抬升或扰动社区指标，此时越线不应直接等同真异动，标记为待人工复核。
+    这里只做标记不改判定：把决定权留给运营，而不是用规则替他下结论。
+    """
+    sql = "SELECT * FROM events WHERE start_date<=? AND end_date>=?"
+    params = [str(day), str(day)]
+    if g:
+        sql += " AND game=?"
+        params.append(g)
+    return bool(query(sql, params))
+
 
 def anomaly_report(game=None, base_days=7):
     """
@@ -535,7 +648,15 @@ def anomaly_report(game=None, base_days=7):
       · 基准用 7 日均值而不是前一日 —— 单日环比的噪声太大，
         周三比周日跌 20% 多半是周内节律，不是异动。
 
-    返回 list[dict]：metric / cur / base / change（展示文字）/ down / note。
+    v4.3 补三个确认维度（不改变原有判定，只增加可解释性字段）：
+      · 同环比校验 wow_change / confirmed：同向=真异动，反向=疑似节律；
+      · 连续确认 streak：连续同向天数，>=2 说明是趋势而非单点噪声；
+      · 活动日标记 special：活动期内波动，标记待人工复核。
+    判定分三级 level：danger（已确认且 streak>=2）/ warn（已确认）
+    / watch（未确认，仅观察）。
+
+    返回 list[dict]：metric / cur / base / change（展示文字）/ down / note
+    + wow_change / confirmed / streak / special / level。
     DAU 异动时 note 附按游戏拆分的贡献定位（多维拆解是归因的第一步）。
     """
     g = game if (game and game != "全部") else None
@@ -602,6 +723,26 @@ def anomaly_report(game=None, base_days=7):
             if parts:
                 note = "拆分：" + "、".join(parts[:2])
 
+        # ── v4.3：同环比校验 + 连续确认 + 活动日标记 ──
+        wow_change, confirmed = _wow_check(d_last, col, mode, g, change)
+        streak = _streak_days(d_last, col, base_days, g, change)
+        special = _in_event_window(last, g)
+
+        if confirmed and streak >= 2:
+            level = "danger"
+        elif confirmed:
+            level = "warn"
+        else:
+            level = "watch"
+
+        if wow_change:
+            tag = "同环比同向确认" if confirmed else "同环比反向，疑似节律波动"
+            note += ("；" if note else "") + f"{tag}（周环比 {wow_change}）"
+        if streak >= 2:
+            note += f"；连续 {streak} 天同向"
+        if special:
+            note += "；活动期内，请人工复核节律"
+
         out.append({
             "metric": label,
             "cur": cur,
@@ -609,6 +750,11 @@ def anomaly_report(game=None, base_days=7):
             "change": change_txt,
             "down": change < 0,
             "note": note,
+            "wow_change": wow_change,
+            "confirmed": confirmed,
+            "streak": streak,
+            "special": special,
+            "level": level,
         })
     return out
 

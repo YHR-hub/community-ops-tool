@@ -244,6 +244,106 @@ def main():
         assert db.anomaly_report(game="不存在游戏") == []
     check("异动检测空库安全", anomaly_empty_db)
 
+    # ── v4.3 异动确认三维度：同环比 / 连续确认 / 活动日 ──
+    def anomaly_confirm_fields():
+        # 演示库上每个异动项都必须带齐确认字段，且 level 与判定自洽
+        rows = db.anomaly_report()
+        assert rows, "演示库应有异动可检"
+        for r in rows:
+            for k in ("wow_change", "confirmed", "streak", "special", "level"):
+                assert k in r, f"缺少确认字段 {k}"
+            assert r["level"] in ("danger", "warn", "watch")
+            if r["confirmed"] and r["streak"] >= 2:
+                assert r["level"] == "danger"
+            if not r["confirmed"]:
+                assert r["level"] == "watch"
+    check("异动确认字段齐全且分级自洽", anomaly_confirm_fields)
+
+    def anomaly_periodic_dip_is_watch():
+        # 确定性造数：周期性周末低谷（每 7 天一个低点）
+        # 最近一天是低谷日 → 环比越线；但上周同日同样低 → 同环比≈0
+        # → 判为节律误报，仅观察级（这正是 Q2「周末虚惊」的真实形态）
+        from datetime import date as _date, timedelta as _td
+        db.execute("DELETE FROM daily_metrics WHERE game=?", ("节律测试",))
+        anchor = _date.today()
+        try:
+            for k in range(30, 0, -1):
+                d = anchor - _td(days=k)
+                # 每 7 天一个低谷：k % 7 == 1 的那天是低谷（含最近一天 k=1）
+                dau = 10000 if k % 7 == 1 else 20000
+                db.execute(
+                    "INSERT INTO daily_metrics "
+                    "(date,game,dau,new_users,new_posts,comments,avg_session,"
+                    "interaction_rate) VALUES (?,?,?,?,?,?,?,?)",
+                    (str(d), "节律测试", dau, 100, 50, 200, 20.0, 4.0))
+            rows = [r for r in db.anomaly_report(game="节律测试")
+                    if r["metric"] == "DAU"]
+            assert rows, "低谷日应触发环比越线"
+            r = rows[0]
+            assert r["confirmed"] is False, "周期性低谷不应被确认为真异动"
+            assert r["level"] == "watch", f"应为观察级，实际 {r['level']}"
+            assert "疑似节律波动" in r["note"]
+        finally:
+            db.execute("DELETE FROM daily_metrics WHERE game=?", ("节律测试",))
+    check("周期性低谷判为观察级（节律误报降噪）", anomaly_periodic_dip_is_watch)
+
+    def anomaly_single_crash_is_confirmed():
+        # 反例：真异动（持续多天的断层下跌）不能被节律规则误降级
+        from datetime import date as _date, timedelta as _td
+        db.execute("DELETE FROM daily_metrics WHERE game=?", ("断层测试",))
+        anchor = _date.today()
+        try:
+            for k in range(20, 0, -1):
+                d = str(anchor - _td(days=k))
+                dau = 10000 if k <= 3 else 20000   # 最近 3 天断层下跌
+                db.execute(
+                    "INSERT INTO daily_metrics "
+                    "(date,game,dau,new_users,new_posts,comments,avg_session,"
+                    "interaction_rate) VALUES (?,?,?,?,?,?,?,?)",
+                    (d, "断层测试", dau, 100, 50, 200, 20.0, 4.0))
+            rows = [r for r in db.anomaly_report(game="断层测试")
+                    if r["metric"] == "DAU"]
+            assert rows, "断层下跌应被捕获"
+            r = rows[0]
+            assert r["confirmed"] is True, "真实断层下跌不应被误判为节律"
+        finally:
+            db.execute("DELETE FROM daily_metrics WHERE game=?", ("断层测试",))
+    check("真异动不被节律规则误降级", anomaly_single_crash_is_confirmed)
+
+    def anomaly_trend_is_danger():
+        # 确定性造数：连续多天持续下滑 → 同环比同向 + streak>=2 → danger
+        from datetime import date as _date, timedelta as _td
+        db.execute("DELETE FROM daily_metrics WHERE game=?", ("趋势测试",))
+        anchor = _date.today()
+        try:
+            for k in range(20, 0, -1):
+                d = str(anchor - _td(days=k))
+                dau = int(20000 - (20 - k) * 400)   # 每天跌 400，持续趋势
+                db.execute(
+                    "INSERT INTO daily_metrics "
+                    "(date,game,dau,new_users,new_posts,comments,avg_session,"
+                    "interaction_rate) VALUES (?,?,?,?,?,?,?,?)",
+                    (d, "趋势测试", dau, 100, 50, 200, 20.0, 4.0))
+            rows = [r for r in db.anomaly_report(game="趋势测试")
+                    if r["metric"] == "DAU"]
+            assert rows, "持续下滑应被捕获"
+            r = rows[0]
+            assert r["confirmed"] is True, "持续趋势应被同环比确认"
+            assert r["streak"] >= 2, f"连续同向天数应 >=2，实际 {r['streak']}"
+            assert r["level"] == "danger", f"应为 danger，实际 {r['level']}"
+        finally:
+            db.execute("DELETE FROM daily_metrics WHERE game=?", ("趋势测试",))
+    check("连续趋势确认为 danger", anomaly_trend_is_danger)
+
+    def anomaly_special_day_marked():
+        # 活动期内的异动带 special 标记，提示人工复核
+        from datetime import date as _date
+        assert db._in_event_window(str(_date.today())) is not None
+        rows = db.anomaly_report()
+        for r in rows:
+            assert isinstance(r["special"], bool)
+    check("活动日标记可用", anomaly_special_day_marked)
+
     # ── v4.2 早报智能体 ──
     def agent_briefing_runs():
         # 演示库上全链路生成：结构完整、轨迹可解释、不依赖 AI Key
