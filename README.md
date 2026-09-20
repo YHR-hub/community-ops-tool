@@ -99,10 +99,16 @@ python seed_demo.py --reset   # 清空全部业务数据
 
 ### 自测
 ```bash
-python smoke_test.py   # 40 项：页面渲染 + 弹窗 + 核心逻辑 + 布局不变量 + 留存/异动/智能体
-python flow_test.py    # 34 项：录入/导入/切换/标记/报告/早报 完整流程
+python smoke_test.py   # 47 项：页面渲染 + 弹窗 + 核心逻辑 + 布局不变量 + 异动确认 + 智能体
+python flow_test.py    # 34 项：录入/导入/切换/标记/报告/早报闭环 完整流程
 python capture.py      # 14 张截图，用于肉眼验收（画面被遮挡时会跳过而非存错图）
+
+pytest tests/ -m "not gui"   # 纯逻辑用例（异动确认/动作映射/归因分派），秒级反馈
 ```
+
+三个 CI job 各管一段：`lint`（ruff，ubuntu）→ `fast-test`（pytest 纯逻辑，ubuntu，秒级）
+→ `smoke-test`（GUI 全量 81 项，Windows runner）。分层是为了让 PR 上先红的永远是
+最快、最便宜的那一个。
 
 ### 自行打包
 ```bash
