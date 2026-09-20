@@ -1,5 +1,18 @@
 # 米游社运营助手 (miHoYo Community Ops Tool) v4.2
 
+<div align="center">
+
+[简体中文](README.md) | [English](README_EN.md)
+
+[![CI](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
+![Tests](https://img.shields.io/badge/tests-74%20passing-brightgreen)
+
+**[⬇ 下载 exe（Windows，免安装）](https://github.com/YHR-hub/community-ops-tool/releases/latest)**
+
+</div>
+
 游戏社区运营全流程管理桌面工具，面向米哈游系产品（原神 · 崩铁 · 绝区零 · 崩坏3）的日常运营工作。
 
 > **v4.2 是早报智能体版**：在 v4.1 数据能力（留存分析 + 异动归因）之上，
