@@ -36,7 +36,7 @@ from db import (init_db, save_config, load_config, add_log, recent_logs,
 from views import (OverviewMixin, DataMixin, VersionsMixin,
                    AnalysisMixin, ReportMixin)
 
-APP_VERSION = "4.2"
+APP_VERSION = "4.3"
 APP_TITLE = "米游社运营助手"
 
 ctk.set_appearance_mode("dark")
