@@ -24,7 +24,7 @@ from datetime import datetime
 
 from db import (
     anomaly_report, retention_stats, metrics_between, latest_version,
-    task_progress, date_str, days_ago, load_config, query,
+    date_str, days_ago, load_config, query,
 )
 
 # 与总览页 THRESHOLDS 保持一致：智能体不另立口径

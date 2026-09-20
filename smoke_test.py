@@ -52,8 +52,6 @@ def main():
         print(f"  (seed 跳过: {e})")
 
     import main as app_main
-    from views import (OverviewMixin, DataMixin, VersionsMixin,
-                       AnalysisMixin, ReportMixin)
 
     print("\n=== 1. 构造 App ===")
     app = None

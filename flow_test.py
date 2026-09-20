@@ -242,7 +242,6 @@ def main():
     check("版本详情打开", open_detail, 1)
 
     def detail_tabs():
-        from views.versions import VersionsMixin
         dlg = [w for w in app.winfo_children()
                if isinstance(w, ctk.CTkToplevel)][-1]
         # 找到 host 与 tabbar

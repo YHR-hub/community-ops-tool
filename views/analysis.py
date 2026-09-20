@@ -21,24 +21,20 @@ import customtkinter as ctk
 
 import theme
 from theme import (
-    BG_APP, BG_CARD, BG_ELEVATED, BG_BORDER, BG_CONTENT,
-    PRIMARY, PRIMARY_DIM, PRIMARY_HOVER, DANGER, SUCCESS, WARNING, INFO, AI, AI_HOVER,
+    BG_APP, BG_CARD, BG_ELEVATED, BG_BORDER, PRIMARY, PRIMARY_DIM, DANGER, SUCCESS, WARNING, INFO, AI, AI_HOVER,
     NEUTRAL,
     TEXT_PRIMARY, TEXT_BODY, TEXT_SECONDARY, TEXT_TERTIARY,
-    font, num_font, SIZE_H1, SIZE_H2, SIZE_H3, SIZE_BODY, SIZE_SMALL, SIZE_TINY,
-    SP_XS, SP_SM, SP_MD, SP_LG, SP_XL, RADIUS_MD, RADIUS_LG,
+    font, num_font, SIZE_H3, SIZE_BODY, SIZE_SMALL, SIZE_TINY,
+    SP_XS, SP_SM, SP_MD, SP_LG, RADIUS_MD,
 )
 import icons
 import components as C
 import charts
-import db
 from db import (
-    GAMES, query, execute, get_conn, load_config, save_config,
-    get_versions, get_version_by_id, metrics_between, task_progress,
+    GAMES, query, execute, load_config, save_config,
+    get_versions, metrics_between, task_progress,
     open_risks, budget_summary, top_characters, community_summary,
-    previous_version, version_series,
-    date_str, days_ago, parse_date, latest_version, safe_float,
-    retention_series, retention_stats, valid_retention,
+    previous_version, date_str, days_ago, parse_date, latest_version, retention_series, retention_stats, valid_retention,
 )
 
 # ═══════════════════════════════════════════════════════════
@@ -1126,7 +1122,6 @@ class AnalysisMixin:
             return
 
         cur = [r for r in rows if r["date"] >= date_str(days_ago(30))]
-        prev = [r for r in rows if r["date"] < date_str(days_ago(30))]
         stats = retention_stats(date_str(days_ago(30)), end, game)
 
         # ── 三张留存卡 ──

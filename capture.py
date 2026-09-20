@@ -141,14 +141,6 @@ def main():
     apps = [w for w in app.winfo_children() if isinstance(w, ctk.CTkToplevel)]
     if apps:
         shoot(apps[-1], "04b_版本详情")
-        # 切到角色使用率子 Tab
-        for child in apps[-1].winfo_children():
-            pass
-        try:
-            hosts = [c for c in apps[-1].winfo_children()
-                     if isinstance(c, ctk.CTkFrame)]
-        except Exception:
-            hosts = []
         apps[-1].destroy()
     app.update()
 

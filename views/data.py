@@ -18,7 +18,6 @@
 
 import csv
 import os
-from datetime import datetime
 from tkinter import filedialog
 
 import customtkinter as ctk
@@ -26,19 +25,17 @@ import customtkinter as ctk
 import theme
 from theme import (
     BG_APP, BG_CARD, BG_ELEVATED, BG_BORDER,
-    PRIMARY, DANGER, SUCCESS, WARNING, INFO, AI, NEUTRAL,
-    TEXT_PRIMARY, TEXT_BODY, TEXT_SECONDARY, TEXT_TERTIARY,
-    font, num_font, SIZE_H3, SIZE_BODY, SIZE_SMALL, SIZE_TINY,
-    SP_XS, SP_SM, SP_MD, SP_LG, SP_XL, RADIUS_MD,
+    PRIMARY, DANGER, SUCCESS, WARNING, TEXT_PRIMARY, TEXT_BODY, TEXT_SECONDARY, TEXT_TERTIARY,
+    font, num_font, SIZE_H3, SIZE_SMALL, SIZE_TINY,
+    SP_XS, SP_SM, SP_MD, SP_LG, RADIUS_MD,
 )
 import icons
 import components as C
 import charts
 import db
 from db import (
-    GAMES, query, execute, get_versions, latest_version,
-    upsert_char_usage, upsert_community_hot, top_characters,
-    community_summary, date_str, safe_int, safe_float, valid_date,
+    GAMES, query, execute, get_versions, top_characters,
+    date_str, safe_int, safe_float, valid_date,
 )
 
 # CSV 表头 → 数据库列名。允许中文表头，降低使用门槛。

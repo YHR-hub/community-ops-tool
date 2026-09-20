@@ -10,25 +10,23 @@
     2. 遇到异常数据时，用强调卡把问题拎出来，一眼看到
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import customtkinter as ctk
 
 import theme
 from theme import (
-    BG_CARD, BG_APP, BG_BORDER, BG_ELEVATED,
+    BG_CARD, BG_APP, BG_ELEVATED,
     PRIMARY, DANGER, SUCCESS, WARNING, INFO, AI, NEUTRAL,
     TEXT_PRIMARY, TEXT_BODY, TEXT_SECONDARY, TEXT_TERTIARY,
-    font, SIZE_H2, SIZE_H3, SIZE_BODY, SIZE_SMALL, SIZE_TINY,
+    font, SIZE_H3, SIZE_BODY, SIZE_SMALL, SIZE_TINY,
     SP_XS, SP_SM, SP_MD, SP_LG, RADIUS_MD,
 )
 import icons
 import components as C
 import charts
 from db import (
-    metrics_between, latest_version, task_progress, task_progress_map,
-    open_risks, community_summary, top_characters, get_versions,
-    date_str, days_ago, parse_date, budget_summary, retention_stats,
+    metrics_between, latest_version, task_progress, open_risks, date_str, days_ago, parse_date, retention_stats,
     anomaly_report,
 )
 

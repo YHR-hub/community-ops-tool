@@ -1,0 +1,25 @@
+# ruff 配置 —— 渐进式静态检查
+# 策略：先只开「确定性错误」（F: pyflakes / E: 语法级风格），
+# 存量代码全部清干净后再逐档放宽规则，避免一次性上千告警劝退自己。
+line-length = 100
+target-version = "py311"
+
+exclude = [
+    "_legacy",     # v2.x 旧视图，已废弃仅留档
+    "build",
+    "dist",
+]
+
+[lint]
+select = [
+    "F",    # pyflakes：未使用导入/变量、未定义名等确定性错误
+    "E4",
+    "E7",
+    "E9",   # pycodestyle 的语法级问题（缩进、语法错误）
+]
+ignore = [
+    "E501",  # 行长度交给 line-length 与人工判断，中文注释易误报
+]
+
+[lint.per-file-ignores]
+"capture.py" = ["F401"]  # 截图脚本按需导入，未使用属正常

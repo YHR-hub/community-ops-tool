@@ -15,7 +15,7 @@ import tkinter as tk
 
 from theme import (
     BG_APP, BG_CARD, BG_BORDER, PRIMARY, INFO, TEXT_PRIMARY, TEXT_SECONDARY,
-    TEXT_TERTIARY, SUCCESS, WARNING, font, SIZE_TINY, SIZE_SMALL,
+    TEXT_TERTIARY, font, SIZE_TINY, SIZE_SMALL,
 )
 from components import blend
 
@@ -414,7 +414,6 @@ class ProgressBar(tk.Canvas):
         w = self.winfo_width()
         if w <= 1:
             return
-        r = self._h / 2
         self.create_rectangle(0, 0, w, self._h, fill=self._track, outline="")
         fw = max(0, w * self._pct / 100)
         if fw >= 1:

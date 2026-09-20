@@ -49,7 +49,7 @@ NAV_ITEMS = [
     ("analysis", "分析", "bulb", "4"),
     ("report", "报告", "doc", "5"),
 ]
-NAV_LABEL = {k: l for k, l, *_ in NAV_ITEMS}
+NAV_LABEL = {key: label for key, label, *_ in NAV_ITEMS}
 
 
 class AppState:

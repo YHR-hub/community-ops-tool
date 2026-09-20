@@ -13,8 +13,7 @@ Canvas 手绘的好处：
   零依赖、打包无副作用、可跟随主题色变色、风格完全统一。
 """
 
-from theme import (TEXT_SECONDARY, TEXT_PRIMARY, BG_CARD, BG_ELEVATED,
-                   PRIMARY, SUCCESS, WARNING, INFO, AI, NEUTRAL)
+from theme import (TEXT_SECONDARY, BG_CARD, NEUTRAL)
 
 # 每个图标由一组绘制指令描述：(kind, coords, options)
 # 这样图标定义是纯数据，可复用、可测。

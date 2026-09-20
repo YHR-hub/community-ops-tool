@@ -14,18 +14,16 @@
   · 版本对比时格式化参数错位 → 显示成 %s 或数字串位
 """
 
-import tkinter as tk
 from datetime import datetime, timedelta
 
 import customtkinter as ctk
 
 import theme
 from theme import (
-    BG_APP, BG_CARD, BG_ELEVATED, BG_BORDER, BG_CONTENT,
-    PRIMARY, PRIMARY_DIM, PRIMARY_HOVER, DANGER, SUCCESS, WARNING, INFO, AI, NEUTRAL,
+    BG_APP, BG_CARD, BG_ELEVATED, BG_BORDER, PRIMARY, PRIMARY_DIM, PRIMARY_HOVER, DANGER, SUCCESS, WARNING, INFO, NEUTRAL,
     TEXT_PRIMARY, TEXT_BODY, TEXT_SECONDARY, TEXT_TERTIARY,
-    font, num_font, SIZE_H1, SIZE_H2, SIZE_H3, SIZE_BODY, SIZE_SMALL, SIZE_TINY,
-    SP_XS, SP_SM, SP_MD, SP_LG, SP_XL, RADIUS_MD, RADIUS_LG,
+    font, SIZE_H1, SIZE_H2, SIZE_H3, SIZE_SMALL, SIZE_TINY,
+    SP_XS, SP_SM, SP_MD, SP_LG, SP_XL, RADIUS_MD,
 )
 import icons
 import components as C
@@ -33,10 +31,9 @@ import charts
 import db
 from db import (
     GAMES, query, execute, get_versions, get_version_by_id,
-    previous_version, version_series,
-    task_progress, task_progress_map, open_risks, budget_summary,
-    safe_int, safe_float, valid_date,
-    date_str, days_ago, parse_date, top_characters,
+    previous_version, task_progress, task_progress_map, open_risks, budget_summary,
+    valid_date,
+    date_str, parse_date, top_characters,
 )
 
 # 版本状态的中文展示顺序

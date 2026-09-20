@@ -667,7 +667,6 @@ def anomaly_report(game=None, base_days=7):
 
     d_last = datetime.strptime(last, "%Y-%m-%d").date()
     base_start = date_str(d_last - timedelta(days=base_days))
-    base_end = date_str(d_last - timedelta(days=1))
 
     sql = "SELECT * FROM daily_metrics WHERE date>=? AND date<=?"
     params = [base_start, last]
@@ -784,7 +783,6 @@ def previous_version(version_row):
     if not version_row:
         return None
     game = version_row.get("game") if hasattr(version_row, "get") else version_row["game"]
-    cur = version_row.get("version") if hasattr(version_row, "get") else version_row["version"]
     start = version_row.get("start_date") if hasattr(version_row, "get") else version_row["start_date"]
 
     row = query(
