@@ -83,7 +83,7 @@ python main.py
 ### Demo data
 ```bash
 python seed_demo.py           # fill if empty
-python seed_demo.py --force   # regenerate (aligned to HSR 3.8)
+python seed_demo.py --force   # regenerate (aligned to HSR 4.5)
 ```
 
 ### Tests
@@ -118,7 +118,7 @@ community-ops-tool/
 ├── icons.py                 # 33 hand-drawn Canvas vector icons
 ├── charts.py                # Adaptive charts: Line / Bar / Gantt / ProgressBar
 ├── db.py                    # Data layer: schema / indexes / queries / input validation
-├── seed_demo.py             # Demo data generator (HSR 3.8)
+├── seed_demo.py             # Demo data generator (HSR 4.5)
 ├── smoke_test.py            # Render smoke tests (incl. layout invariants)
 ├── flow_test.py             # Business-flow tests
 ├── capture.py               # Screenshot acceptance script

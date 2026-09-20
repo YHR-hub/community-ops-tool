@@ -24,15 +24,16 @@ random.seed(20260919)  # 固定种子，保证每次生成的演示数据一致
 
 GAME = "崩坏：星穹铁道"
 
-# 角色池（用于生成使用率数据）—— 对齐 3.8「记忆是梦的开场白」卡池
+# 角色池（用于生成使用率数据）—— 对齐 4.5「挥掷千星的筹码」卡池
+# （知更鸟·晴歌 / 砂金·戏浪双SP，复刻风堇 / 不死途，4.4 SP 姬子·启行）
 CHARACTERS = [
-    "流萤", "忘归人", "阿格莱雅", "大丽花", "符玄", "花火", "砂金",
-    "知更鸟", "星期日", "灵砂", "阮·梅", "罗刹", "卡芙卡", "景元",
+    "知更鸟·晴歌", "砂金·戏浪", "姬子·启行", "风堇", "不死途", "遨蝶",
+    "长夜月", "昔涟", "遐蝶", "飞霄", "知更鸟", "花火", "符玄", "流萤",
 ]
 
 # 上游版本（用于制造"使用率下降"的趋势，让风险检测有东西可抓）
-PREV_VERSION = "3.7"
-CUR_VERSION = "3.8"
+PREV_VERSION = "4.4"
+CUR_VERSION = "4.5"
 
 PLATFORMS = ["米游社", "B站", "微博", "抖音", "贴吧"]
 
@@ -56,11 +57,11 @@ BUDGET_ITEMS = [
 ]
 
 EVENTS = [
-    ("3.8版本预约活动", "版本活动", -3, 12),
+    ("4.6版本前瞻预约活动", "版本活动", -3, 12),
     ("新角色同人征集大赛", "福利活动", -6, 20),
     ("米游社创作者激励计划", "福利活动", -14, 30),
     ("品牌联动特别直播", "联动", 4, 4),
-    ("周年庆预热签到", "福利活动", -8, 8),
+    ("巡星之礼签到活动", "福利活动", -8, 8),
 ]
 
 
@@ -96,7 +97,7 @@ def seed(force=False):
         "INSERT INTO versions (game,version,start_date,end_date,status,highlights,notes) "
         "VALUES (?,?,?,?,?,?,?)",
         (GAME, PREV_VERSION, str(prev_start), str(prev_start + timedelta(days=42)),
-         "closed", "复刻角色返场，主线剧情推进至匹诺康尼终章",
+         "closed", "姬子·启行SP形态上线，二相乐园新篇章开启",
          "版本整体表现平稳，社区口碑正向"))
     count += 1
 
@@ -104,7 +105,7 @@ def seed(force=False):
         "INSERT INTO versions (game,version,start_date,end_date,status,highlights,notes) "
         "VALUES (?,?,?,?,?,?,?)",
         (GAME, CUR_VERSION, str(cur_start), str(cur_start + timedelta(days=42)),
-         "live", "新角色大丽花上线，流萤同步复刻，黄金嗷呜大师赛开启",
+         "live", "知更鸟·晴歌/砂金·戏浪双SP登场，千星城开放",
          "关注互动率下滑问题"))
     count += 1
 
@@ -113,8 +114,8 @@ def seed(force=False):
     db.execute(
         "INSERT INTO versions (game,version,start_date,end_date,status,highlights,notes) "
         "VALUES (?,?,?,?,?,?,?)",
-        ("原神", "5.2", str(other_start), str(other_start + timedelta(days=42)),
-         "live", "纳塔地区新地图开放", ""))
+        ("原神", "7.0", str(other_start), str(other_start + timedelta(days=42)),
+         "live", "主线推进至至冬篇，周年庆节点前蓄势", ""))
     count += 1
 
     # ═══════════════════════════════════════════════
@@ -234,7 +235,7 @@ def seed(force=False):
     #  6. 风险
     # ═══════════════════════════════════════════════
     risks = [
-        ("阿格莱雅使用率连续下滑，存在角色强度争议", "high", "high",
+        ("姬子·启行使用率连续下滑，存在角色强度争议", "high", "high",
          "分析角色定位，评估是否需要数值调整",
          "准备角色加强方案或同定位替代角色推广", "运营"),
         ("B站投放预算使用率已达 94%，可能超支", "medium", "medium",
@@ -265,14 +266,14 @@ def seed(force=False):
             "version": PREV_VERSION, "character_name": ch,
             "usage_rate": round(max(2.0, base), 1), "abyss_floor": 12})
 
-        # 阿格莱雅、大丽花 明显下滑，触发自动风险标记。
+        # 姬子·启行、风堇 明显下滑（4.4 顶流被 4.5 双SP分流），触发自动风险标记。
         # drop 下限 7.0：叠加随机噪声（+1.6 上限）后净差仍 ≥5.4pp，
         # 保证必然越过「下滑超 5pp」的抓取线 ——
         # v4.1 曾因随机序列变化让 drop 掉到 5.5 + 1.6，测试抓取数从 2 变 1。
         drop = 0
-        if ch in ("阿格莱雅", "大丽花"):
+        if ch in ("姬子·启行", "风堇"):
             drop = random.uniform(7.0, 9.5)
-        elif ch in ("花火", "星期日"):
+        elif ch in ("流萤", "花火"):
             drop = random.uniform(1.0, 3.0)
 
         cur_usage.append({

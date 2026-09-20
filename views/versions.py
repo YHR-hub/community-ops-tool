@@ -398,7 +398,7 @@ class VersionsMixin:
         f_game = C.Field(form, "游戏", kind="menu", values=GAMES, width=210,
                          label_width=72, default=GAMES[1])
         f_game.pack(fill="x", pady=(0, SP_SM))
-        f_ver = C.Field(form, "版本号", placeholder="如 3.7", width=210,
+        f_ver = C.Field(form, "版本号", placeholder="如 4.5", width=210,
                         label_width=72)
         f_ver.pack(fill="x", pady=(0, SP_SM))
         f_start = C.Field(form, "开始日期", placeholder="YYYY-MM-DD",

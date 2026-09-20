@@ -315,8 +315,8 @@ def main():
         app.update()
         rows = db.open_risks(v["id"])
         titles = [r["title"] for r in rows]
-        # 应抓到 阿格莱雅 与 大丽花（种子里植入 >5pp 下滑）
-        hit = [t for t in titles if "阿格莱雅" in t or "大丽花" in t]
+        # 应抓到 姬子·启行 与 风堇（种子里植入 >5pp 下滑）
+        hit = [t for t in titles if "姬子·启行" in t or "风堇" in t]
         # 旧版会写出 "%!s(float=52.3)" 这类垃圾标题
         garbage = [t for t in titles if "float" in t or "%!" in t]
         return (len(hit), len(garbage))

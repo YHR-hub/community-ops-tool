@@ -280,7 +280,7 @@ def main():
     def agent_compose_attribution():
         # 纯函数归因分派：留存下滑 × 互动率走低 → 内容；留存下滑 × 互动率平稳 → 渠道
         import agent as ops_agent
-        base = {"has_data": True, "game": "崩坏：星穹铁道", "version": "3.8",
+        base = {"has_data": True, "game": "崩坏：星穹铁道", "version": "4.5",
                 "day": 12, "ret_cur": 43.2, "ret_drop": -1.8,
                 "alerts": [{"level": "danger", "text": "次日留存环比 -1.8pp"}],
                 "actions": ["核对渠道投放"], "ups": []}
