@@ -26,6 +26,31 @@ import pytest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _isolated_test_db():
+    """
+    v4.4：纯逻辑用例跑在独立测试库上，绝不碰用户真实数据。
+
+    起因：用户把工具切到「真实模式」后，测试如果直接 import db，
+    就会往真实库写演示数据——测试必须自带环境，不能依赖外部状态。
+    """
+    sys.path.insert(0, ROOT)
+    import pathlib
+
+    import db
+    p = pathlib.Path(ROOT) / "data" / "test_logic.db"
+    db.DB_PATH = p
+    for suffix in ("", "-wal", "-shm"):
+        f = pathlib.Path(str(p) + suffix)
+        if f.exists():
+            f.unlink()
+    db.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    db.init_db()
+    import seed_demo
+    seed_demo.seed(force=False)
+    yield
+
+
 def _run(script, *args):
     """在项目根下跑一个测试脚本，返回 (returncode, 输出)。"""
     proc = subprocess.run(

@@ -7,7 +7,7 @@
 [![CI](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tests](https://img.shields.io/badge/tests-84%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-86%20passing-brightgreen)
 
 **[⬇ 下载 exe（Windows，免安装）](https://github.com/YHR-hub/community-ops-tool/releases/latest)**
 
@@ -99,7 +99,7 @@ python seed_demo.py --reset   # 清空全部业务数据
 
 ### 自测
 ```bash
-python smoke_test.py   # 50 项：页面渲染 + 弹窗 + 核心逻辑 + 布局不变量 + 异动确认 + 智能体
+python smoke_test.py   # 52 项：页面渲染 + 弹窗 + 核心逻辑 + 布局不变量 + 异动确认 + 智能体
 python flow_test.py    # 34 项：录入/导入/切换/标记/报告/早报闭环 完整流程
 python capture.py      # 14 张截图，用于肉眼验收（画面被遮挡时会跳过而非存错图）
 
@@ -107,7 +107,7 @@ pytest tests/ -m "not gui"   # 纯逻辑用例（异动确认/动作映射/归�
 ```
 
 三个 CI job 各管一段：`lint`（ruff，ubuntu）→ `fast-test`（pytest 纯逻辑，ubuntu，秒级）
-→ `smoke-test`（GUI 全量 84 项，Windows runner）。分层是为了让 PR 上先红的永远是
+→ `smoke-test`（GUI 全量 86 项，Windows runner）。分层是为了让 PR 上先红的永远是
 最快、最便宜的那一个。
 
 ### 自行打包
@@ -240,7 +240,7 @@ CSV 解析 + 列名映射 + 逐行校验原本全写在 `views/data.py` 里，
 - **ruff**：渐进策略（先只开 F/E4/E7/E9），清掉 87 处存量问题，CI 独立 lint job；
 - **pytest 适配层**（`tests/test_ops.py`）：既有脚本当整体用例跑（中文明细一条不丢），
   另加 6 个纯逻辑用例秒级反馈——异动确认、动作映射、归因分派、数据源归一化；
-- **CI 三层**：`lint`（ubuntu）→ `fast-test`（ubuntu，秒级）→ `smoke-test`（Windows GUI 全量 84 项），
+- **CI 三层**：`lint`（ubuntu）→ `fast-test`（ubuntu，秒级）→ `smoke-test`（Windows GUI 全量 86 项），
   让 PR 上先红的永远是最快最便宜的那个；
 - **Release 自动化**：推送 `v*` tag 即触发打包 → exe 冒烟（确认 exe 旁生成 `data/ops_data.db`，
   防止 onefile 路径 bug 复发）→ 自动建 Release 挂 exe；
@@ -250,7 +250,38 @@ CSV 解析 + 列名映射 + 逐行校验原本全写在 `views/data.py` 里，
 ### 明确不做的事
 
 架构重写。Mixin 分层在 9k 行规模是合理的，拆 repository/domain 层是过度设计，
-还会把已经跑通的 84 项测试全部打乱。
+还会把已经跑通的 86 项测试全部打乱。
+
+## v4.4 分析力升级：数据 × 事件对齐 · 报告导出
+
+v4.3 把「可信」和「可维护」补齐之后，v4.4 补的是**分析深度**：
+
+### ① 趋势图事件标注（数据 × 事件对齐）
+
+趋势曲线上一件事一直没被回答：**「那天数据为什么动？」**
+现在版本事件（上线/活动/联动）会以虚线标注到 DAU 曲线上——
+「4.6 上线当天 DAU 跳了多少」变成一眼可见的事。
+
+实现细节：事件日期不在数据点上时**就近吸附（±1 天）**（日志录的日期和指标
+日期常差半天一天）；只标数据覆盖范围内的事件；最多 6 个、标签上下交错防重叠。
+
+这背后是一个分析观：**指标表和事件表分开看都是"没结论的数据"，
+关联起来才是运营结论**——版本节奏 × 数据响应的对齐能力，是数据运营的基本功。
+（配套产出见「数据实践」：星铁版本档案数据集与节奏分析报告。）
+
+### ② 报告导出 Markdown
+
+报告页新增「导出 MD」：智能报告 / 周期报表一键导出 .md 文件，
+带生成时间戳——方便直接放进文档体系继续加工。
+（为什么不导 txt：报告多半要继续改写成内容，Markdown 是通用格式，
+txt 导出去还得重新排版。）
+
+### ③ 测试环境隔离（工程习惯修正）
+
+v4.4 顺手修了一个隐患：工具切「真实模式」后，测试脚本会把演示数据
+灌进真实库。现在 smoke / flow / capture / pytest **全部使用独立测试库**
+（`data/test_*.db`），测试自己带环境，绝不碰用户数据——
+「测试不能依赖外部状态」这条原则，从「说出来」变成了「做出来」。
 
 ## v4.1 数据能力升级：留存分析 + 异动归因
 

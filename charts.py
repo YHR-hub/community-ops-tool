@@ -14,8 +14,8 @@
 import tkinter as tk
 
 from theme import (
-    BG_APP, BG_CARD, BG_BORDER, PRIMARY, INFO, TEXT_PRIMARY, TEXT_SECONDARY,
-    TEXT_TERTIARY, font, SIZE_TINY, SIZE_SMALL,
+    BG_APP, BG_CARD, BG_BORDER, PRIMARY, INFO, WARNING, TEXT_PRIMARY,
+    TEXT_SECONDARY, TEXT_TERTIARY, font, SIZE_TINY, SIZE_SMALL,
 )
 from components import blend
 
@@ -105,6 +105,15 @@ class LineChart(_BaseChart):
       fill    —— 是否填充到基线（只给主指标开，双轴都填会糊）
       width   —— 线宽，副指标建议 1.4 以便和主指标拉开层级
       smooth  —— 滑动平均窗口，0 表示不平滑（离散事件数据应设为 0）
+
+    v4.4 新增 markers（可选）：在曲线上标注事件节点（版本上线/活动开始），
+    让「数据变化」和「当时发生了什么」能对上——
+    运营分析里这两张表（指标表 × 事件表）的关联才是结论的来源。
+
+    markers = [
+        {"index": 5, "label": "4.6上线", "slot": 0},  # index = labels 下标
+    ]
+    slot 用于标签交错（0/1 交替），避免相邻事件标签重叠。
     """
 
     def __init__(self, parent, height=210, show_legend=True, **kw):
@@ -179,6 +188,21 @@ class LineChart(_BaseChart):
                 self.create_text(pad_l + cw + 8, gy, text=_fmt_axis(v),
                                  fill=blend(INFO, BG_CARD, 0.55),
                                  font=font(SIZE_TINY), anchor="w")
+
+        # ── 事件标注（画在曲线下层，不遮挡数据）──
+        # 「数据 × 事件」的对齐分析：版本上线那天的 DAU 有没有跳？
+        # 这条线就是把两张表连起来的视觉工具。
+        for mk in (d.get("markers") or []):
+            i = mk.get("index")
+            if i is None or not (0 <= i < len(labels)):
+                continue
+            mx = xpos(i)
+            self.create_line(mx, pad_t, mx, pad_t + ch,
+                             fill=blend(WARNING, BG_CARD, 0.45), dash=(3, 3))
+            self.create_text(mx, pad_t + 3 + (mk.get("slot", 0) % 2) * 14,
+                             text=mk.get("label", ""),
+                             fill=blend(WARNING, TEXT_SECONDARY, 0.45),
+                             font=font(SIZE_TINY), anchor="n")
 
         # ── 折线 ──
         # 分两遍画：先铺所有填充面积，再画所有折线。

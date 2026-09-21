@@ -130,6 +130,8 @@ class ReportMixin:
                         width=112, height=32).pack(side="left")
         C.GhostButton(row, "复制全文", self._copy_report, icon="copy",
                       width=104, height=32).pack(side="left", padx=(SP_SM, 0))
+        C.GhostButton(row, "导出 MD", self._export_md, icon="download",
+                      width=96, height=32).pack(side="left", padx=(SP_SM, 0))
         if on_csv:
             C.GhostButton(row, "导出 CSV", on_csv, icon="download",
                           width=104, height=32).pack(side="left", padx=(SP_SM, 0))
@@ -138,6 +140,39 @@ class ReportMixin:
                             width=104, height=32, accent=AI,
                             hover=AI_HOVER).pack(side="right")
         return row
+
+    def _export_md(self):
+        """
+        v4.4：报告导出为 Markdown 文件。
+
+        为什么是 Markdown 而不是 txt：报告多半要继续加工——
+        放进作品集、改写进内容、发到协作文档。Markdown 是这些场景的
+        通用格式，而 txt 导出来还得重新排版。
+        """
+        try:
+            content = self.rp_output.get("1.0", "end").strip()
+        except Exception:
+            content = ""
+        if not content:
+            self.toast("还没有可导出的内容", WARNING)
+            return
+        from datetime import datetime
+        default_name = f"运营报告_{datetime.now().strftime('%Y%m%d_%H%M')}.md"
+        path = filedialog.asksaveasfilename(
+            title="导出报告", defaultextension=".md",
+            initialfile=default_name,
+            filetypes=[("Markdown 文件", "*.md"), ("所有文件", "*.*")])
+        if not path:
+            return
+        try:
+            stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(f"<!-- 由米游社运营助手导出 · {stamp} -->\n\n")
+                f.write(content)
+            self.toast(f"已导出：{os.path.basename(path)}")
+            self.log("导出报告 MD", os.path.basename(path))
+        except Exception as e:
+            self.toast(f"导出失败：{e}", DANGER)
 
     def _copy_report(self):
         try:

@@ -42,7 +42,17 @@ def check(name, fn, expect=None):
 
 
 def main():
+    import pathlib
+
     import db
+    # v4.4：测试用独立数据库，绝不碰用户真实数据（data/ops_data.db）
+    _test_db = pathlib.Path(__file__).parent / "data" / "test_flow.db"
+    db.DB_PATH = _test_db
+    for _suffix in ("", "-wal", "-shm"):
+        _p = pathlib.Path(str(_test_db) + _suffix)
+        if _p.exists():
+            _p.unlink()
+    db.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     db.init_db()
     db.ensure_unique_indexes()
 

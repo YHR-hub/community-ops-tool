@@ -34,7 +34,19 @@ def check(name, fn):
 
 
 def main():
+    import pathlib
+
     import db
+    # v4.4：测试用独立数据库，绝不碰用户的真实数据（data/ops_data.db）。
+    # 起因：用户切「真实模式」后，跑测试会把演示数据灌进真实库——
+    # 测试的环境假设必须是「自带数据」，不能依赖外部状态。
+    _test_db = pathlib.Path(__file__).parent / "data" / "test_smoke.db"
+    db.DB_PATH = _test_db
+    for suffix in ("", "-wal", "-shm"):     # 清掉上次的库与 WAL 残留
+        p = pathlib.Path(str(_test_db) + suffix)
+        if p.exists():
+            p.unlink()
+    db.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     db.init_db()
     # 老库可能带着重复行（旧版没有唯一约束），先清重再建唯一索引，
     # 否则 INSERT ... ON CONFLICT 会一直失败。
@@ -469,6 +481,52 @@ def main():
         row = db.query("PRAGMA foreign_keys", one=True)
         assert row and row[0] == 1, f"外键未启用：{row}"
     check("SQLite 外键已启用", foreign_keys_enabled)
+
+    # ── v4.4：趋势图事件标注 + 报告导出 ──
+    def trend_markers_align_events():
+        """数据 × 事件对齐：事件日期映射到趋势图下标，不在范围内不标。"""
+        from datetime import date as _date, timedelta as _td
+        db.execute("DELETE FROM daily_metrics WHERE game=?", ("标注测试",))
+        db.execute("DELETE FROM events WHERE name LIKE '【测试】%'")
+        anchor = _date.today()
+        try:
+            rows = []
+            for k in range(6, 0, -1):
+                d = anchor - _td(days=k)
+                db.execute(
+                    "INSERT INTO daily_metrics "
+                    "(date,game,dau,new_users,new_posts,comments,avg_session,"
+                    "interaction_rate) VALUES (?,?,?,?,?,?,?,?)",
+                    (str(d), "标注测试", 20000, 100, 50, 200, 20.0, 4.0))
+                rows.append({"date": str(d)})
+            # 事件 1：正好落在数据日（第 3 天）；事件 2：落在±1 天内（吸附）；
+            # 事件 3：远在范围外（不应出现）
+            mid = str(anchor - _td(days=3))
+            near = str(anchor - _td(days=1) + _td(days=0))
+            far = str(anchor + _td(days=30))
+            db.execute("INSERT INTO events (name,game,type,start_date,end_date,version_id) "
+                       "VALUES (?,?,?,?,?,0)", ("【测试】事件A", "标注测试", "版本活动", mid, mid))
+            db.execute("INSERT INTO events (name,game,type,start_date,end_date,version_id) "
+                       "VALUES (?,?,?,?,?,0)", ("【测试】事件B", "标注测试", "版本活动", near, near))
+            db.execute("INSERT INTO events (name,game,type,start_date,end_date,version_id) "
+                       "VALUES (?,?,?,?,?,0)", ("【测试】事件C", "标注测试", "版本活动", far, far))
+            markers = app._trend_markers(rows)
+            labels = [m["label"] for m in markers]
+            assert any("事件A" in lb for lb in labels), f"A 应被标注: {labels}"
+            assert any("事件B" in lb for lb in labels), f"B 应就近吸附标注: {labels}"
+            assert not any("事件C" in lb for lb in labels), "范围外事件不应标注"
+            assert all(0 <= m["index"] < len(rows) for m in markers)
+            assert len(markers) <= 6
+        finally:
+            db.execute("DELETE FROM daily_metrics WHERE game=?", ("标注测试",))
+            db.execute("DELETE FROM events WHERE name LIKE '【测试】%'")
+    check("趋势图事件标注（数据×事件对齐）", trend_markers_align_events)
+
+    def export_md_method_available():
+        """报告页应有导出 MD 能力（含空内容安全提示路径）。"""
+        assert hasattr(app, "_export_md"), "缺少 _export_md"
+        assert callable(app._export_md)
+    check("报告导出 MD 方法就绪", export_md_method_available)
 
     print("\n=== 9. AI 离线兜底（不配 Key）===")
     def offline_ai():

@@ -27,7 +27,7 @@ import components as C
 import charts
 from db import (
     metrics_between, latest_version, task_progress, open_risks, date_str, days_ago, parse_date, retention_stats,
-    anomaly_report,
+    anomaly_report, query,
 )
 
 # 指标异常判定阈值（抽成常量，不再散落在各处）
@@ -216,6 +216,9 @@ class OverviewMixin:
                     {"name": "互动率(%)", "values": [r["interaction_rate"] for r in rows],
                      "color": INFO, "axis": "right", "width": 1.4, "smooth": 3},
                 ],
+                # v4.4：把版本事件标到曲线上——「那天发生了什么」和
+                # 「数据怎么动」对得上，趋势图才从展示变成分析工具。
+                "markers": self._trend_markers(rows),
             })
         else:
             for w in card.body.winfo_children():
@@ -224,6 +227,47 @@ class OverviewMixin:
             C.EmptyState(card.body, "还没有运营数据", "chart",
                          "去「数据」页录入，或点击下方载入演示数据",
                          "载入演示数据", self._load_demo).pack(fill="x")
+
+    def _trend_markers(self, rows, limit=6):
+        """
+        v4.4：把近期版本事件映射成趋势图的标注（数据 × 事件对齐）。
+
+        规则：
+          · 只标数据覆盖范围内的事件（曲线上没有的日子标了没意义）；
+          · 事件日不在数据点上时，就近吸附（±1 天）——日志录入的日期
+            和指标日期常有半天一天的出入；
+          · 最多 6 个 + 标签上下交错，避免挤成一团。
+        """
+        try:
+            date_idx = {r["date"]: i for i, r in enumerate(rows)}
+            evs = query(
+                "SELECT name, start_date FROM events "
+                "WHERE start_date>=? ORDER BY start_date LIMIT 12",
+                (rows[0]["date"],))
+        except Exception:
+            return []
+        out = []
+        for e in evs or []:
+            d = str(e["start_date"])
+            idx = date_idx.get(d)
+            if idx is None:      # 就近吸附 ±1 天
+                from datetime import datetime, timedelta
+                try:
+                    base = datetime.strptime(d, "%Y-%m-%d").date()
+                except ValueError:
+                    continue
+                for off in (1, -1):
+                    idx = date_idx.get(str(base + timedelta(days=off)))
+                    if idx is not None:
+                        break
+            if idx is None:
+                continue
+            out.append({"index": idx,
+                        "label": str(e["name"])[:9],
+                        "slot": len(out) % 2})
+            if len(out) >= limit:
+                break
+        return out
 
     def _trend_hint(self, rows):
         """
@@ -465,7 +509,8 @@ class OverviewMixin:
         def worker():
             try:
                 b = ops_agent.generate()
-            except Exception as e:      # noqa: BLE001（线程里只能兜住再回传）
+            except Exception as e:      # noqa: BLE001
+                # 线程里只能兜住异常再回传主线程（不能在这里崩溃）
                 err = str(e)
                 self.after(0, lambda: self._on_briefing_failed(err))
                 return
