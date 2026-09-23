@@ -78,8 +78,8 @@ def main():
         traceback.print_exc(limit=8)
         return
 
-    print("\n=== 2. 五个主页面渲染 ===")
-    for key in ("overview", "data", "versions", "analysis", "report"):
+    print("\n=== 2. 六个主页面渲染 ===")
+    for key in ("overview", "data", "versions", "analysis", "report", "industry"):
         def go(k=key):
             app.show_view(k)
             app.update()
@@ -527,6 +527,38 @@ def main():
         assert hasattr(app, "_export_md"), "缺少 _export_md"
         assert callable(app._export_md)
     check("报告导出 MD 方法就绪", export_md_method_available)
+
+    # ── v4.5：行业情报页 ──
+    def industry_page_with_data():
+        """行业页：灌一条数据 → 渲染 → 验证显示 → 清理。"""
+        db.execute("INSERT OR REPLACE INTO industry_events "
+                   "(date,category,title,detail,impact) "
+                   "VALUES ('2026-09-01','行业','【测试】行业事件','d','i')")
+        db.execute("INSERT OR REPLACE INTO competitor_revenue "
+                   "(month,product,revenue,note) "
+                   "VALUES ('2026-08','【测试】产品',1.0,'n')")
+        db.execute("INSERT INTO insight_cases "
+                   "(name,market,framework,takeaway) "
+                   "VALUES ('【测试】案例','美','f','t')")
+        try:
+            app.show_industry()
+            app.update()
+            app.update_idletasks()
+        finally:
+            db.execute("DELETE FROM industry_events WHERE title LIKE '【测试】%'")
+            db.execute("DELETE FROM competitor_revenue WHERE product LIKE '【测试】%'")
+            db.execute("DELETE FROM insight_cases WHERE name LIKE '【测试】%'")
+    check("行业情报页（空态+数据态渲染）", industry_page_with_data)
+
+    def industry_data_intact_after_demo_reset():
+        """设计承诺：重置演示数据不应清空行业情报（它是长期资产）。"""
+        import inspect
+
+        import seed_demo
+        code = inspect.getsource(seed_demo._wipe)
+        for t in ("industry_events", "competitor_revenue", "insight_cases"):
+            assert t not in code, f"_wipe 不应包含 {t}"
+    check("行业表不被演示重置清空（设计断言）", industry_data_intact_after_demo_reset)
 
     print("\n=== 9. AI 离线兜底（不配 Key）===")
     def offline_ai():

@@ -9,6 +9,9 @@ v3.1 的视图划分（一个能力只有一个入口）：
   analysis  分析     —— 版本健康度、AI 顾问、版本对比
   report    报告     —— 智能报告、周期报表、历史归档
 
+v4.5 新增：
+  industry  行业     —— 行业事件 / 竞品流水 / 舆情案例（与行业知识库联动）
+
 旧版视图已废弃：dashboard.py / ai.py / plans.py（能力已并入上表）。
 """
 
@@ -17,6 +20,7 @@ from .data import DataMixin
 from .versions import VersionsMixin
 from .analysis import AnalysisMixin
 from .report import ReportMixin
+from .industry import IndustryMixin
 
 __all__ = [
     "OverviewMixin",
@@ -24,4 +28,5 @@ __all__ = [
     "VersionsMixin",
     "AnalysisMixin",
     "ReportMixin",
+    "IndustryMixin",
 ]

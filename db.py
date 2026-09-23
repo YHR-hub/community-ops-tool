@@ -231,6 +231,37 @@ CREATE TABLE IF NOT EXISTS community_hot (
     update_time     TEXT DEFAULT (datetime('now','localtime')),
     UNIQUE(version, platform)
 );
+
+-- ═══ v4.5 行业情报（与「行业知识库」目录联动）═══
+-- 把行业观察从 markdown 变成可查询的活数据：
+-- 行业事件时间线 / 竞品流水对比 / 舆情案例卡 三张表。
+CREATE TABLE IF NOT EXISTS industry_events (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    date     TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT '行业',   -- 版本/舆情/公司/竞品/政策
+    title    TEXT NOT NULL,
+    detail   TEXT DEFAULT '',
+    impact   TEXT DEFAULT '',                -- 运营视角观察（一句话）
+    source   TEXT DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS competitor_revenue (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    month   TEXT NOT NULL,                   -- 2026-08
+    product TEXT NOT NULL,
+    revenue REAL NOT NULL,                   -- 亿元（第三方估算口径）
+    note    TEXT DEFAULT '',
+    UNIQUE(month, product)
+);
+
+CREATE TABLE IF NOT EXISTS insight_cases (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    name      TEXT NOT NULL,
+    market    TEXT NOT NULL DEFAULT '全球',   -- 美/韩/日/中/全球
+    framework TEXT DEFAULT '',               -- 分析框架/核心结论
+    takeaway  TEXT DEFAULT '',               -- 可迁移的启示
+    source    TEXT DEFAULT ''
+);
 """
 
 # 索引 —— 按实际查询路径设计，不是无脑加
@@ -248,6 +279,9 @@ INDEXES = [
     ("idx_char_usage_version", "char_usage(version)"),
     ("idx_community_version", "community_hot(version)"),
     ("idx_reports_created", "reports(created_at)"),
+    ("idx_industry_date", "industry_events(date)"),
+    ("idx_industry_cat", "industry_events(category)"),
+    ("idx_comp_month", "competitor_revenue(month)"),
 ]
 
 # 唯一约束 —— 必须单独建 UNIQUE INDEX，不能只写在 CREATE TABLE 里。
@@ -261,6 +295,7 @@ UNIQUE_INDEXES = [
     ("ux_versions_game_ver", "versions(game, version)"),
     ("ux_char_usage", "char_usage(version, character_name)"),
     ("ux_community", "community_hot(version, platform)"),
+    ("ux_industry_event", "industry_events(date, title)"),
 ]
 
 # 迁移：旧库缺的列，按 (表, 列, 定义) 声明
@@ -349,7 +384,8 @@ def db_stats():
     """返回各表行数，供自检 / 设置页使用。"""
     out = {}
     for t in ("versions", "daily_metrics", "events", "checklists", "reports",
-              "budgets", "risks", "char_usage", "community_hot", "activity_log"):
+              "budgets", "risks", "char_usage", "community_hot", "activity_log",
+              "industry_events", "competitor_revenue", "insight_cases"):
         try:
             row = query(f"SELECT COUNT(*) AS n FROM {t}", one=True)
             out[t] = row["n"] if row else 0

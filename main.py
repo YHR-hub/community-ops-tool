@@ -34,9 +34,9 @@ from db import (init_db, save_config, load_config, add_log, recent_logs,
                 ensure_unique_indexes)
 
 from views import (OverviewMixin, DataMixin, VersionsMixin,
-                   AnalysisMixin, ReportMixin)
+                   AnalysisMixin, ReportMixin, IndustryMixin)
 
-APP_VERSION = "4.4"
+APP_VERSION = "4.5"
 APP_TITLE = "米游社运营助手"
 
 ctk.set_appearance_mode("dark")
@@ -48,6 +48,7 @@ NAV_ITEMS = [
     ("versions", "版本", "calendar", "3"),
     ("analysis", "分析", "bulb", "4"),
     ("report", "报告", "doc", "5"),
+    ("industry", "行业", "search", "6"),
 ]
 NAV_LABEL = {key: label for key, label, *_ in NAV_ITEMS}
 
@@ -112,7 +113,7 @@ class BaseMixin:
 
 
 class App(OverviewMixin, DataMixin, VersionsMixin, AnalysisMixin, ReportMixin,
-          BaseMixin, ctk.CTk):
+          IndustryMixin, BaseMixin, ctk.CTk):
     def __init__(self):
         super().__init__()
 

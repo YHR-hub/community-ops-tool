@@ -7,7 +7,7 @@
 [![CI](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tests](https://img.shields.io/badge/tests-86%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-89%20passing-brightgreen)
 
 **[⬇ 下载 exe（Windows，免安装）](https://github.com/YHR-hub/community-ops-tool/releases/latest)**
 
@@ -34,7 +34,7 @@
 
 ## 功能模块
 
-五个主导航，一个能力只有一个入口。
+六个主导航，一个能力只有一个入口。
 
 | 模块 | 功能 |
 |------|------|
@@ -43,6 +43,7 @@
 | 版本 | 状态看板 / 甘特时间线 / 版本详情抽屉（任务 · 风险 · 预算 · 角色使用率） |
 | 分析 | 版本健康度四维体检、AI 运营顾问（7 场景）、两版本全指标对比、**留存分析（曲线 + 健康线 + 交叉归因）** |
 | 报告 | 四段式智能报告、周期报表（周报/月报/季报，可导 CSV）、历史归档可查看可删除 |
+| **行业** | **行业事件时间线 / 竞品流水对比（图）/ 舆情案例卡**——与「行业知识库」目录联动的活数据层 |
 
 ## 技术栈
 
@@ -99,7 +100,7 @@ python seed_demo.py --reset   # 清空全部业务数据
 
 ### 自测
 ```bash
-python smoke_test.py   # 52 项：页面渲染 + 弹窗 + 核心逻辑 + 布局不变量 + 异动确认 + 智能体
+python smoke_test.py   # 55 项：页面渲染 + 弹窗 + 核心逻辑 + 布局不变量 + 异动确认 + 智能体
 python flow_test.py    # 34 项：录入/导入/切换/标记/报告/早报闭环 完整流程
 python capture.py      # 14 张截图，用于肉眼验收（画面被遮挡时会跳过而非存错图）
 
@@ -107,7 +108,7 @@ pytest tests/ -m "not gui"   # 纯逻辑用例（异动确认/动作映射/归�
 ```
 
 三个 CI job 各管一段：`lint`（ruff，ubuntu）→ `fast-test`（pytest 纯逻辑，ubuntu，秒级）
-→ `smoke-test`（GUI 全量 86 项，Windows runner）。分层是为了让 PR 上先红的永远是
+→ `smoke-test`（GUI 全量 89 项，Windows runner）。分层是为了让 PR 上先红的永远是
 最快、最便宜的那一个。
 
 ### 自行打包
@@ -240,7 +241,7 @@ CSV 解析 + 列名映射 + 逐行校验原本全写在 `views/data.py` 里，
 - **ruff**：渐进策略（先只开 F/E4/E7/E9），清掉 87 处存量问题，CI 独立 lint job；
 - **pytest 适配层**（`tests/test_ops.py`）：既有脚本当整体用例跑（中文明细一条不丢），
   另加 6 个纯逻辑用例秒级反馈——异动确认、动作映射、归因分派、数据源归一化；
-- **CI 三层**：`lint`（ubuntu）→ `fast-test`（ubuntu，秒级）→ `smoke-test`（Windows GUI 全量 86 项），
+- **CI 三层**：`lint`（ubuntu）→ `fast-test`（ubuntu，秒级）→ `smoke-test`（Windows GUI 全量 89 项），
   让 PR 上先红的永远是最快最便宜的那个；
 - **Release 自动化**：推送 `v*` tag 即触发打包 → exe 冒烟（确认 exe 旁生成 `data/ops_data.db`，
   防止 onefile 路径 bug 复发）→ 自动建 Release 挂 exe；
@@ -250,7 +251,31 @@ CSV 解析 + 列名映射 + 逐行校验原本全写在 `views/data.py` 里，
 ### 明确不做的事
 
 架构重写。Mixin 分层在 9k 行规模是合理的，拆 repository/domain 层是过度设计，
-还会把已经跑通的 86 项测试全部打乱。
+还会把已经跑通的 89 项测试全部打乱。
+
+## v4.5 行业视角：知识库 × 工具的融合
+
+v4.4 之前，这个工具管的是「自己的数据」；v4.5 开始，它同时装着「行业的数据」。
+
+### 行业情报页（第六个主导航）
+
+- **行业事件时间线**：版本 / 舆情 / 公司 / 竞品 / 政策五类事件，按日期倒序，
+  每条带一句「运营视角观察」——行业动态不是新闻列表，是带判断的档案
+- **竞品流水对比**：月度横向条形图（第三方估算口径，脚注标明——**口径意识要写进界面**）
+- **舆情案例卡**：市场 / 框架 / 启示 三段式，全部标注来源，面试可直接引用
+
+### 与「行业知识库」的分工
+
+```
+行业知识库/（markdown，完整档案）      ← 人读的长期沉淀
+        ↓ seed_industry.py 摘录
+运营助手「行业」页（sqlite，活数据）    ← 工具里查/用/面试验证
+```
+
+### 一个设计承诺（有测试守着）
+
+「重置数据」只重置自有运营数据——**行业情报三张表不在清理列表里**，
+作为长期资产保留。这条承诺写了一道测试断言守着，不靠自觉。
 
 ## v4.4 分析力升级：数据 × 事件对齐 · 报告导出
 
