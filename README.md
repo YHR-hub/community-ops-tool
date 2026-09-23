@@ -7,7 +7,7 @@
 [![CI](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tests](https://img.shields.io/badge/tests-89%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-91%20passing-brightgreen)
 
 **[⬇ 下载 exe（Windows，免安装）](https://github.com/YHR-hub/community-ops-tool/releases/latest)**
 
@@ -34,7 +34,7 @@
 
 ## 功能模块
 
-六个主导航，一个能力只有一个入口。
+七个主导航，一个能力只有一个入口。
 
 | 模块 | 功能 |
 |------|------|
@@ -44,6 +44,7 @@
 | 分析 | 版本健康度四维体检、AI 运营顾问（7 场景）、两版本全指标对比、**留存分析（曲线 + 健康线 + 交叉归因）** |
 | 报告 | 四段式智能报告、周期报表（周报/月报/季报，可导 CSV）、历史归档可查看可删除 |
 | **行业** | **行业事件时间线 / 竞品流水对比（图）/ 舆情案例卡**——与「行业知识库」目录联动的活数据层 |
+| **文库** | **Obsidian 式知识库浏览器**：文件树 / 双链跳转 / 反向链接 / 全文搜索 / vault 可切换 |
 
 ## 技术栈
 
@@ -100,7 +101,7 @@ python seed_demo.py --reset   # 清空全部业务数据
 
 ### 自测
 ```bash
-python smoke_test.py   # 55 项：页面渲染 + 弹窗 + 核心逻辑 + 布局不变量 + 异动确认 + 智能体
+python smoke_test.py   # 57 项：页面渲染 + 弹窗 + 核心逻辑 + 布局不变量 + 异动确认 + 智能体
 python flow_test.py    # 34 项：录入/导入/切换/标记/报告/早报闭环 完整流程
 python capture.py      # 14 张截图，用于肉眼验收（画面被遮挡时会跳过而非存错图）
 
@@ -108,7 +109,7 @@ pytest tests/ -m "not gui"   # 纯逻辑用例（异动确认/动作映射/归�
 ```
 
 三个 CI job 各管一段：`lint`（ruff，ubuntu）→ `fast-test`（pytest 纯逻辑，ubuntu，秒级）
-→ `smoke-test`（GUI 全量 89 项，Windows runner）。分层是为了让 PR 上先红的永远是
+→ `smoke-test`（GUI 全量 91 项，Windows runner）。分层是为了让 PR 上先红的永远是
 最快、最便宜的那一个。
 
 ### 自行打包
@@ -241,7 +242,7 @@ CSV 解析 + 列名映射 + 逐行校验原本全写在 `views/data.py` 里，
 - **ruff**：渐进策略（先只开 F/E4/E7/E9），清掉 87 处存量问题，CI 独立 lint job；
 - **pytest 适配层**（`tests/test_ops.py`）：既有脚本当整体用例跑（中文明细一条不丢），
   另加 6 个纯逻辑用例秒级反馈——异动确认、动作映射、归因分派、数据源归一化；
-- **CI 三层**：`lint`（ubuntu）→ `fast-test`（ubuntu，秒级）→ `smoke-test`（Windows GUI 全量 89 项），
+- **CI 三层**：`lint`（ubuntu）→ `fast-test`（ubuntu，秒级）→ `smoke-test`（Windows GUI 全量 91 项），
   让 PR 上先红的永远是最快最便宜的那个；
 - **Release 自动化**：推送 `v*` tag 即触发打包 → exe 冒烟（确认 exe 旁生成 `data/ops_data.db`，
   防止 onefile 路径 bug 复发）→ 自动建 Release 挂 exe；
@@ -251,7 +252,26 @@ CSV 解析 + 列名映射 + 逐行校验原本全写在 `views/data.py` 里，
 ### 明确不做的事
 
 架构重写。Mixin 分层在 9k 行规模是合理的，拆 repository/domain 层是过度设计，
-还会把已经跑通的 89 项测试全部打乱。
+还会把已经跑通的 91 项测试全部打乱。
+
+## v4.6 文库：把知识库变成 Obsidian 式的工作台
+
+行业知识库、内容系列、研究文档——知道有，但找起来靠翻文件夹？文库页解决这个。
+
+### 一个只读的 markdown 工作台
+
+- **文件树**：挂载 vault（默认 ，可换任意目录）扫描全部 .md
+- **阅读器**：标题 / 引用 / 代码块 / 加粗基础渲染
+- **[[双向链接]]**：点击跳转（支持 `[[目标|别名]]` 写法），未创建的目标会给提示
+- **反向链接**：打开任一文件，底部自动列出「谁引用了我」
+- **全文搜索**：关键词 → 文件:行:片段，点击直达
+- **vault 可切换**：把整个「面试资料」挂进来也行
+
+### 为什么不做编辑和图谱
+
+编辑交给专业的（Obsidian / VSCode）——工具的角色是「快速查阅」；
+文件量级（<100）下图形谱的信息密度低，反链面板完成了同样的活。
+**克制，是知道什么不做。**
 
 ## v4.5 行业视角：知识库 × 工具的融合
 

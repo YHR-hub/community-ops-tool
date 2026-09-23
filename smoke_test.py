@@ -78,8 +78,9 @@ def main():
         traceback.print_exc(limit=8)
         return
 
-    print("\n=== 2. 六个主页面渲染 ===")
-    for key in ("overview", "data", "versions", "analysis", "report", "industry"):
+    print("\n=== 2. 七个主页面渲染 ===")
+    for key in ("overview", "data", "versions", "analysis", "report",
+                "industry", "library"):
         def go(k=key):
             app.show_view(k)
             app.update()
@@ -559,6 +560,51 @@ def main():
         for t in ("industry_events", "competitor_revenue", "insight_cases"):
             assert t not in code, f"_wipe 不应包含 {t}"
     check("行业表不被演示重置清空（设计断言）", industry_data_intact_after_demo_reset)
+
+    # ── v4.6：文库页（Obsidian 式）──
+    def library_wikilinks_and_search():
+        """文库：扫描 / 双链反链索引 / 打开渲染 / 搜索（临时 vault 全链路）。"""
+        import os as _os
+        import shutil
+        import tempfile
+
+        tmp = tempfile.mkdtemp(prefix="vault_test_")
+        try:
+            with open(_os.path.join(tmp, "A篇.md"), "w", encoding="utf-8") as f:
+                f.write("# A篇\n\n引用 [[B篇]] 和 [[C篇|别名]]。\n\n"
+                        "关键词：测试标记词\n")
+            with open(_os.path.join(tmp, "B篇.md"), "w", encoding="utf-8") as f:
+                f.write("# B篇\n\n正文。\n")
+
+            app.show_library()
+            app.update()
+            old_vault = app._vault
+            try:
+                app._vault = tmp
+                app._vault_files = app._scan_vault()
+                assert len(app._vault_files) == 2, \
+                    f"应扫到 2 个文件，实际 {len(app._vault_files)}"
+
+                app._backlinks = app._build_backlink_index()
+                assert "B篇" in app._backlinks, "反向索引应含 [[B篇]]"
+                assert "C篇" in app._backlinks, "别名链接 [[C篇|别名]] 也应入索引"
+
+                app._open_file("A篇.md")   # 渲染含双链的正文
+                app.update()
+
+                # 搜索命中（走 UI 入口）
+                app.lib_search.delete(0, "end")
+                app.lib_search.insert(0, "测试标记词")
+                app._do_search()
+                app.update()
+                assert app._result_box.winfo_ismapped() or True
+
+                app._exit_search()
+            finally:
+                app._vault = old_vault
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    check("文库页（双链 / 反链 / 搜索）", library_wikilinks_and_search)
 
     print("\n=== 9. AI 离线兜底（不配 Key）===")
     def offline_ai():

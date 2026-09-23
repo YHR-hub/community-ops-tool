@@ -12,6 +12,9 @@ v3.1 的视图划分（一个能力只有一个入口）：
 v4.5 新增：
   industry  行业     —— 行业事件 / 竞品流水 / 舆情案例（与行业知识库联动）
 
+v4.6 新增：
+  library   文库     —— Obsidian 式知识库浏览器（双链/反链/搜索）
+
 旧版视图已废弃：dashboard.py / ai.py / plans.py（能力已并入上表）。
 """
 
@@ -21,6 +24,7 @@ from .versions import VersionsMixin
 from .analysis import AnalysisMixin
 from .report import ReportMixin
 from .industry import IndustryMixin
+from .library import LibraryMixin
 
 __all__ = [
     "OverviewMixin",
@@ -29,4 +33,5 @@ __all__ = [
     "AnalysisMixin",
     "ReportMixin",
     "IndustryMixin",
+    "LibraryMixin",
 ]
