@@ -54,11 +54,33 @@ jobs:
         shell: pwsh
         run: Copy-Item "dist\米游社运营助手.exe" "dist\MiyoOpsTool.exe"
 
-      - name: Create release with exe
+      - name: Create release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "${{ github.ref_name }}" `
-            "dist/MiyoOpsTool.exe#米游社运营助手 (Windows 单文件，双击即用)" `
             --title "${{ github.ref_name }} · 米游社运营助手" `
             --generate-notes
+
+      - name: Upload exe to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 分两步：创建与上传分离。曾出现过 create 一步里附带文件
+          # 被静默丢弃（步骤绿、asset 为空）的情况——分开后上传失败必红。
+          # 若上一轮已有同名 asset（重跑场景），--clobber 覆盖。
+          gh release upload "${{ github.ref_name }}" `
+            "dist/MiyoOpsTool.exe#米游社运营助手 (Windows 单文件，双击即用)" `
+            --clobber
+
+      - name: Verify asset uploaded
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 上传后再验一次 asset 真的挂上了（防静默失败的第二道保险）
+          $names = gh release view "${{ github.ref_name }}" --json assets --jq '.assets[].name'
+          if ($names -notcontains "MiyoOpsTool.exe") {
+            Write-Error "Release 缺少 exe 附件，构建产物未成功上传"
+            exit 1
+          }
+          Write-Host "asset 校验通过: $names"
