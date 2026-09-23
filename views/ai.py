@@ -1,0 +1,443 @@
+import os
+import random
+import threading
+from datetime import datetime
+from tkinter import messagebox
+
+import customtkinter as ctk
+from PIL import Image, ImageTk
+
+from db import get_conn, load_config, save_config, add_log, date_str, GAMES
+from theme import MHY_RED, MHY_DARK, MHY_CARD, MHY_BORDER, MHY_TEXT, MHY_SUB
+
+
+class AIMixin:
+    def show_ai(self):
+        self.clear_main(on_done=self._build_ai)
+
+    def _build_ai(self):
+        self.highlight_nav(1)
+        self.current_view = "ai"
+
+        banner = ctk.CTkFrame(self.main_frame, fg_color=MHY_CARD, corner_radius=0)
+        banner.pack(fill="x", padx=0, pady=(0, 20))
+        ctk.CTkLabel(banner, text="🤖 AI 运营顾问",
+                     font=("Microsoft YaHei", 26, "bold"), text_color="white").pack(anchor="w", padx=30, pady=(25, 5))
+        ctk.CTkLabel(banner, text="输入运营问题，AI 帮你出谋划策",
+                     font=("Microsoft YaHei", 13), text_color=MHY_SUB).pack(anchor="w", padx=30, pady=(0, 20))
+
+        # API 配置
+        config_frame = ctk.CTkFrame(self.main_frame, fg_color=MHY_CARD, corner_radius=12,
+                                     border_width=1, border_color=MHY_BORDER)
+        config_frame.pack(fill="x", padx=30, pady=15)
+
+        ctk.CTkLabel(config_frame, text="API 配置", font=("Microsoft YaHei", 14, "bold"),
+                     text_color="white").pack(anchor="w", padx=15, pady=(15, 10))
+
+        row = ctk.CTkFrame(config_frame, fg_color="transparent")
+        row.pack(fill="x", padx=15, pady=5)
+        ctk.CTkLabel(row, text="API Key", width=80, text_color=MHY_TEXT).pack(side="left")
+        self.ai_key = ctk.CTkEntry(row, width=320, placeholder_text="sk-...", show="*")
+        self.ai_key.pack(side="left", padx=5)
+        self._key_visible = False
+        self.ai_key_toggle = ctk.CTkButton(row, text="👁", width=30, fg_color=MHY_BORDER,
+                                            hover_color="#3a3a4e", command=self._toggle_key_visibility)
+        self.ai_key_toggle.pack(side="left", padx=2)
+
+        row2 = ctk.CTkFrame(config_frame, fg_color="transparent")
+        row2.pack(fill="x", padx=15, pady=5)
+        ctk.CTkLabel(row2, text="Base URL", width=80, text_color=MHY_TEXT).pack(side="left")
+        self.ai_base = ctk.CTkEntry(row2, width=280, placeholder_text="https://api.deepseek.com（本地填 http://localhost:11434/v1）")
+        self.ai_base.pack(side="left", padx=5)
+        self.ai_model = ctk.CTkOptionMenu(row2, values=[
+            "── 云端模型 ──",
+            "deepseek-chat", "deepseek-v4-pro",
+            "gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo",
+            "── 本地模型（Ollama）──",
+            "qwen2.5:7b", "qwen2.5:14b", "qwen2.5:32b",
+            "llama3.2:3b", "llama3.2:8b",
+            "gemma3:4b", "gemma3:12b",
+            "deepseek-coder-v2:16b", "deepseek-coder-v2:236b",
+        ], width=200)
+        self.ai_model.pack(side="left", padx=5)
+
+        ctk.CTkButton(row2, text="💾 保存配置", fg_color=MHY_CARD, hover_color="#2a2a3e",
+                      text_color=MHY_TEXT, border_width=1, border_color=MHY_BORDER,
+                      command=self._save_ai_config).pack(side="right", padx=5)
+
+        ctk.CTkLabel(config_frame,
+                     text="本地模型需先安装 Ollama（ollama.ai），运行后执行 ollama pull qwen2.5:7b 拉取模型；Base URL 填 http://localhost:11434/v1，API Key 填任意字符串（Ollama 不校验）。",
+                     font=("Microsoft YaHei", 10), text_color=MHY_SUB).pack(anchor="w", padx=15, pady=(2, 8))
+
+        # 加载已保存的配置
+        saved_key = load_config("ai_api_key")
+        saved_base = load_config("ai_base_url")
+        saved_model = load_config("ai_model")
+        self._config_loaded = False
+        if saved_key:
+            self.ai_key.insert(0, saved_key)
+            self._config_loaded = True
+        if saved_base:
+            self.ai_base.insert(0, saved_base)
+        if saved_model:
+            self.ai_model.set(saved_model)
+
+        if self._config_loaded:
+            ctk.CTkLabel(config_frame, text="已加载保存的配置 ✓",
+                         font=("Microsoft YaHei", 11), text_color="#2ecc71").pack(anchor="w", padx=15, pady=(5, 10))
+
+        # Tab 视图：AI 对话 + 词云分析
+        tab_view = ctk.CTkTabview(self.main_frame, fg_color=MHY_CARD,
+                                   segmented_button_fg_color=MHY_DARK,
+                                   segmented_button_selected_color=MHY_RED,
+                                   segmented_button_unselected_color=MHY_BORDER)
+        tab_view.pack(fill="both", expand=True, padx=30, pady=(0, 20))
+        ai_tab = tab_view.add("🤖 AI 对话")
+        wc_tab = tab_view.add("☁️ 词云分析")
+
+        # ── AI 对话标签 ──
+        scene_frame = ctk.CTkFrame(ai_tab, fg_color="transparent")
+        scene_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        ctk.CTkLabel(scene_frame, text="预设场景", font=("Microsoft YaHei", 14, "bold"),
+                      text_color="white").pack(anchor="w", padx=5, pady=(5, 5))
+
+        row = ctk.CTkFrame(scene_frame, fg_color="transparent")
+        row.pack(fill="x", padx=5, pady=(0, 10))
+        ctk.CTkLabel(row, text="选择场景", width=70, text_color=MHY_TEXT).pack(side="left")
+        self.scene_var = ctk.StringVar(value="活动方案建议")
+        scenes = ["活动方案建议","内容选题策划","文案优化","数据分析解读","舆情应对策略","版本复盘框架","版本健康度分析"]
+        self.scene_menu = ctk.CTkOptionMenu(row, variable=self.scene_var, values=scenes, width=170)
+        self.scene_menu.pack(side="left", padx=5)
+        ctk.CTkLabel(row, text="游戏", width=35, text_color=MHY_TEXT).pack(side="left", padx=5)
+        self.ai_game = ctk.CTkOptionMenu(row, values=GAMES, width=120)
+        self.ai_game.pack(side="left", padx=5)
+
+        self.ai_gen_btn = ctk.CTkButton(row, text="🚀 生成", fg_color="#ff4d6a", hover_color="#e0415c",
+                                         command=self._generate_ai, width=100, height=32,
+                                         font=("Microsoft YaHei", 12, "bold"))
+        self.ai_gen_btn.pack(side="right", padx=3)
+        self.ai_health_btn = ctk.CTkButton(row, text="📋 分析当前版本", fg_color=MHY_CARD,
+                                             hover_color="#2a2a3e", text_color=MHY_TEXT,
+                                             border_width=1, border_color=MHY_BORDER,
+                                             command=self._analyze_current_version,
+                                             width=130, height=32, font=("Microsoft YaHei", 12))
+        self.ai_health_btn.pack(side="right", padx=3)
+        self.ai_save_btn = ctk.CTkButton(row, text="💾 保存", fg_color="#8b5cf6", hover_color="#7c3aed",
+                                          command=self._save_ai_result, width=90, height=32,
+                                          font=("Microsoft YaHei", 12, "bold"))
+        self.ai_save_btn.pack(side="right", padx=3)
+        self.ai_copy_btn = ctk.CTkButton(row, text="📋 复制", command=self._copy_ai_result,
+                                           width=90, height=32,
+                                           fg_color=MHY_CARD, hover_color="#2a2a3e",
+                                           text_color=MHY_TEXT, border_width=2, border_color="#5a5a7e",
+                                           font=("Microsoft YaHei", 12))
+        self.ai_copy_btn.pack(side="right", padx=3)
+
+        # 结果展示
+        self.ai_result = ctk.CTkTextbox(scene_frame, height=300, fg_color=MHY_DARK,
+                                         border_width=1, border_color=MHY_BORDER, text_color=MHY_TEXT)
+        self.ai_result.pack(fill="both", expand=True, padx=5, pady=(0, 10))
+        if self._ai_saved_content and self._ai_saved_content != "AI 思考中...\n":
+            self.ai_result.insert("1.0", self._ai_saved_content)
+
+        # ── 词云分析标签 ──
+        self._build_wordcloud_tab(wc_tab)
+
+    def _build_wordcloud_tab(self, parent):
+        self.sample_comments = [
+            "原神新角色太强了，抽爆！", "星穹铁道剧情太感人了", "绝区零战斗手感真好",
+            "崩坏3新版本福利好多", "这次活动奖励太少了", "角色设计越来越好看",
+            "深渊12层终于打过了", "配队攻略求推荐", "新地图探索太有趣了",
+            "剧情刀我，哭死", "抽卡又歪了，非酋附体", "大招动画太帅了吧",
+            "这个版本内容太丰富了", "社区活动什么时候开始", "同人图质量好高",
+            "每日任务太肝了", "联机副本求队友", "角色UP池什么时候复刻",
+            "新皮肤太好看了", "游戏优化越来越好了", "音乐太好听了",
+            "运营活动策划用心了", "建议加强老角色", "新版本预告看了吗",
+            "签到奖励领了吗", "攻略组辛苦了", "社区氛围越来越好了",
+            "角色强度排行有变化", "新活动玩法很创新", "期待下一个版本",
+        ]
+
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        ctk.CTkLabel(frame, text="社区评论词云分析",
+                      font=("Microsoft YaHei", 14, "bold"), text_color="white").pack(anchor="w", padx=5, pady=(5, 5))
+        ctk.CTkLabel(frame, text="基于模拟社区评论数据生成关键词云，洞察玩家关注焦点",
+                      font=("Microsoft YaHei", 11), text_color=MHY_SUB).pack(anchor="w", padx=5, pady=(0, 10))
+
+        btn_row = ctk.CTkFrame(frame, fg_color="transparent")
+        btn_row.pack(fill="x", padx=5, pady=(0, 10))
+        ctk.CTkButton(btn_row, text="🔄 刷新词云", fg_color=MHY_RED, hover_color="#e0415c",
+                       command=self._generate_wordcloud, width=120, height=30).pack(side="left", padx=5)
+        ctk.CTkButton(btn_row, text="✏️ 编辑评论", fg_color=MHY_BORDER, hover_color="#3a3a4e",
+                       text_color=MHY_TEXT, command=self._edit_comments, width=120, height=30).pack(side="left", padx=5)
+
+        self.wc_container = ctk.CTkFrame(frame, fg_color=MHY_DARK, corner_radius=8)
+        self.wc_container.pack(fill="both", expand=True, padx=5, pady=5)
+        self.wc_label = ctk.CTkLabel(self.wc_container, text="点击「刷新词云」生成分析",
+                                      font=("Microsoft YaHei", 14), text_color=MHY_SUB)
+        self.wc_label.pack(expand=True)
+
+    def _generate_wordcloud(self):
+        self.wc_label.configure(text="生成中...")
+        self.after(100, self._do_generate_wordcloud)
+
+    def _do_generate_wordcloud(self):
+        try:
+            from wordcloud import WordCloud
+            import jieba
+            import os
+
+            # 随机选评论（模拟不同数据源）
+            selected = random.sample(self.sample_comments, min(25, len(self.sample_comments)))
+            text = " ".join(selected)
+            words = jieba.lcut(text)
+            # 过滤掉单字和标点
+            words = [w for w in words if len(w) >= 2 and w.strip()]
+
+            zh_font = None
+            for fp in ["C:/Windows/Fonts/msyh.ttc", "C:/Windows/Fonts/simhei.ttf"]:
+                if os.path.exists(fp):
+                    zh_font = fp
+                    break
+
+            wc = WordCloud(
+                width=500, height=350,
+                background_color="#1a1a2e",
+                colormap="Reds",
+                font_path=zh_font,
+                max_words=80,
+                collocations=False,
+                margin=10
+            )
+            wc.generate(" ".join(words))
+
+            temp_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "temp")
+            os.makedirs(temp_dir, exist_ok=True)
+            wc_path = os.path.join(temp_dir, "wordcloud.png")
+            wc.to_file(wc_path)
+
+            img = Image.open(wc_path)
+            # 缩放适配容器
+            ratio = min(480 / img.width, 330 / img.height, 1.0)
+            new_w, new_h = int(img.width * ratio), int(img.height * ratio)
+            img = img.resize((new_w, new_h), Image.LANCZOS)
+            photo = ImageTk.PhotoImage(img)
+            self.wc_label.configure(image=photo, text="")
+            self.wc_label.image = photo
+
+            try:
+                os.remove(wc_path)
+            except:
+                pass
+
+        except Exception as e:
+            self.wc_label.configure(text=f"生成失败: {str(e)[:60]}", image="")
+
+    def _edit_comments(self):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("编辑评论数据")
+        dialog.geometry("550x450")
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.configure(fg_color=MHY_CARD)
+
+        ctk.CTkLabel(dialog, text="编辑社区评论（每行一条）",
+                      font=("Microsoft YaHei", 14, "bold"), text_color="white").pack(pady=(15, 5))
+        ctk.CTkLabel(dialog, text="修改后点击保存，词云将基于新评论生成",
+                      font=("Microsoft YaHei", 11), text_color=MHY_SUB).pack(pady=(0, 10))
+
+        text = ctk.CTkTextbox(dialog, height=280, fg_color=MHY_DARK,
+                               border_width=1, border_color=MHY_BORDER, text_color=MHY_TEXT)
+        text.insert("1.0", "\n".join(self.sample_comments))
+        text.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+
+        def save():
+            content = text.get("1.0", "end-1c").strip()
+            self.sample_comments = [l.strip() for l in content.split("\n") if l.strip()]
+            dialog.destroy()
+            self._toast(f"已保存 {len(self.sample_comments)} 条评论")
+
+        ctk.CTkButton(dialog, text="💾 保存并关闭", fg_color=MHY_RED, hover_color="#e0415c",
+                       command=save, width=120).pack(pady=(0, 15))
+
+    def _save_ai_config(self, silent=False):
+        save_config("ai_api_key", self.ai_key.get())
+        save_config("ai_base_url", self.ai_base.get())
+        save_config("ai_model", self.ai_model.get())
+        if not silent:
+            messagebox.showinfo("提示", "API 配置已保存")
+
+    def _toggle_key_visibility(self):
+        self._key_visible = not self._key_visible
+        self.ai_key.configure(show="" if self._key_visible else "*")
+        self.ai_key_toggle.configure(text="🔒" if self._key_visible else "👁")
+
+    def _copy_ai_result(self):
+        content = self.ai_result.get("1.0", "end-1c")
+        if content and content != "AI 思考中...\n":
+            self.clipboard_clear()
+            self.clipboard_append(content)
+            self._toast("已复制到剪贴板")
+
+    def _save_ai_result(self):
+        content = self.ai_result.get("1.0", "end-1c")
+        if not content or content == "AI 思考中...\n":
+            messagebox.showwarning("提示", "还没有内容可以保存")
+            return
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("保存 AI 方案")
+        dialog.geometry("600x500")
+        dialog.transient(self)
+        dialog.grab_set()
+        dialog.configure(fg_color=MHY_CARD)
+
+        ctk.CTkLabel(dialog, text="保存 AI 生成方案",
+                     font=("Microsoft YaHei", 16, "bold"), text_color="white").pack(pady=(20, 5))
+
+        ctk.CTkLabel(dialog, text="方案标题", font=("Microsoft YaHei", 13),
+                     text_color=MHY_TEXT).pack(anchor="w", padx=25, pady=(15, 3))
+        title_var = ctk.StringVar(value=f"{self.scene_var.get()}_{datetime.now().strftime('%Y%m%d %H:%M')}")
+        title_entry = ctk.CTkEntry(dialog, width=550, textvariable=title_var)
+        title_entry.pack(padx=25, pady=(0, 10))
+
+        ctk.CTkLabel(dialog, text="内容预览", font=("Microsoft YaHei", 13),
+                     text_color=MHY_TEXT).pack(anchor="w", padx=25, pady=(10, 3))
+        preview = ctk.CTkTextbox(dialog, height=220, fg_color=MHY_DARK,
+                                  border_width=1, border_color=MHY_BORDER, text_color=MHY_TEXT)
+        preview.insert("1.0", content[:1500] + ("\n\n... (更多内容将在保存后完整保留)" if len(content) > 1500 else ""))
+        preview.configure(state="disabled")
+        preview.pack(fill="both", expand=True, padx=25, pady=(0, 10))
+
+        btn_row = ctk.CTkFrame(dialog, fg_color="transparent")
+        btn_row.pack(pady=(10, 20))
+        ctk.CTkButton(btn_row, text="❌ 取消", fg_color=MHY_BORDER, hover_color="#3a3a4e",
+                      text_color=MHY_TEXT, command=dialog.destroy, width=120).pack(side="left", padx=10)
+        ctk.CTkButton(btn_row, text="✅ 确认保存", fg_color=MHY_RED, hover_color="#e0415c",
+                      command=lambda: self._do_save_ai(title_var.get(), content, dialog), width=120).pack(side="left", padx=10)
+
+    def _do_save_ai(self, title, content, dialog):
+        if not title.strip():
+            messagebox.showwarning("提示", "请输入方案标题")
+            return
+        try:
+            with get_conn() as c:
+                c.execute("INSERT INTO reports (title,content,type) VALUES (?,?,?)",
+                          (title.strip(), content, "AI顾问"))
+            dialog.destroy()
+            self._toast("方案已保存，可在历史报告中查看")
+        except Exception as e:
+            messagebox.showerror("错误", str(e))
+
+    def _generate_ai(self):
+        if not self.ai_key.get():
+            messagebox.showwarning("提示", "请先输入 API Key")
+            return
+        self._save_ai_config(silent=True)
+        api_key = self.ai_key.get()
+        base_url = self.ai_base.get() or "https://api.deepseek.com"
+        model = self.ai_model.get()
+        game = self.ai_game.get()
+        scene = self.scene_var.get()
+
+        prompts = {
+            "活动方案建议": f"你是一位资深的游戏运营专家。请为{game}设计一个为期14天的社区运营活动方案，目标：提升社区活跃度和用户参与度。要求包含活动主题、玩法机制、奖励设计、推广策略。",
+            "内容选题策划": f"你是一位游戏社区内容运营专家。请为{game}的官方社区策划本周的5个内容选题，覆盖攻略、同人、讨论、资讯等方向。",
+            "文案优化": "请优化以下运营文案，使其更具吸引力和转化率。\n（请在此处粘贴文案）",
+            "数据分析解读": "作为游戏运营数据分析师，请解读运营数据并给出建议。\n（请在此处粘贴数据）",
+            "舆情应对策略": f"你是一位游戏社区危机公关专家。{game}社区出现负面反馈，请给出应对策略。",
+            "版本复盘框架": f"请列出{game}一次完整版本更新的复盘框架，包含指标、对比维度、结论模板。",
+            "版本健康度分析": self._build_health_prompt(),
+        }
+        prompt = prompts.get(scene, "请给出运营建议")
+
+        fallbacks = {
+            "活动方案建议": "【离线兜底建议】\n活动策划方向：\n1. 限时登录签到福利（7天连续签到送抽卡资源）\n2. 社区二创激励活动（UGC征集+投票+奖励）\n3. 版本主题H5互动页面（剧情问答+分享裂变）\n\n建议参考近期热门活动形式，待AI服务恢复后生成详细方案。",
+            "内容选题策划": "【离线兜底建议】\n本周内容选题方向：\n1. 新角色攻略与配队推荐\n2. 版本剧情深度解读\n3. 社区热门同人作品精选\n4. 游戏技巧/冷知识合集\n5. 玩家投稿/话题讨论征集\n\n待AI服务恢复后可深度挖掘具体选题。",
+            "文案优化": "【离线兜底建议】\n文案优化方向：\n1. 使用简洁直白的表达，避免复杂修辞\n2. 突出核心卖点（角色/奖励/剧情），放在开头\n3. 加入情感共鸣元素（角色名句、场景氛围）\n\n待AI服务恢复后提供润色版本。",
+            "数据分析解读": "【离线兜底建议】\n数据解读框架：\n1. 环比/同比对比核心指标（DAU、付费率、留存）\n2. 识别异常波动并标注可能原因\n3. 分层分析（新老用户、付费/非付费用户）\n\n请确认数据源准确性，待AI服务恢复后生成详细解读。",
+            "舆情应对策略": "【离线兜底建议】\n舆情应对核心原则：\n1. 第一时间确认事实，不猜测不回避\n2. 区分诉求合理性与影响范围\n3. 统一对外口径，同步客服话术\n4. 合理诉求快速响应补偿，不合理诉求解释立场\n\n待AI服务恢复后生成完整应对方案。",
+            "版本复盘框架": "【离线兜底建议】\n版本复盘框架：\n一、数据维度：DAU趋势、付费率、留存率、新增/回流\n二、内容维度：主线完成率、活动参与率、角色抽取率\n三、社区维度：正向/负向话题量、UGC产出量、KOL传播量\n四、竞品维度：同期竞品版本表现对比\n\n待AI服务恢复后生成完整复盘模板。",
+            "版本健康度分析": "【离线兜底建议】\n基于当前数据，建议关注使用率波动较大的角色，并参考社区反馈调整活动设计。\n具体可从以下方向入手：\n1. 对比上版本使用率变化幅度TOP5角色\n2. 排查使用率骤降角色是否存在数值或机制问题\n3. 关注社区高回复帖子中的核心诉求\n\n待AI服务恢复后生成详细分析报告。",
+        }
+
+        self.ai_result.delete("1.0", "end")
+        self.ai_result.insert("1.0", "AI 思考中...\n")
+        self.ai_gen_btn.configure(state="disabled", text="⏳ 生成中...")
+
+        def worker():
+            try:
+                from openai import OpenAI
+                client = OpenAI(api_key=api_key, base_url=base_url, timeout=10)
+                resp = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.7,
+                )
+                result = resp.choices[0].message.content
+            except Exception as e:
+                result = fallbacks.get(scene, "当前服务繁忙，请稍后再试。")
+                result += f"\n\n（API暂时不可用：{str(e)[:80]}）"
+            self.after(0, lambda: self._on_ai_done(result))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_ai_done(self, result):
+        self.ai_result.delete("1.0", "end")
+        self.ai_result.insert("1.0", result)
+        self.ai_gen_btn.configure(state="normal", text="🚀 生成")
+
+    def _analyze_current_version(self):
+        """快捷入口：切换到版本健康度分析并生成"""
+        self.scene_var.set("版本健康度分析")
+        self._generate_ai()
+
+    def _build_health_prompt(self):
+        """构建版本健康度分析的 Prompt，从 db 读取数据填充"""
+        try:
+            with get_conn() as c:
+                # 最新版本
+                ver_row = c.execute("SELECT version FROM versions ORDER BY start_date DESC LIMIT 1").fetchone()
+                version = ver_row[0] if ver_row else "未知"
+
+                # TOP5 角色使用率（降序）
+                usage_rows = c.execute(
+                    "SELECT character_name, usage_rate FROM char_usage WHERE version=? ORDER BY usage_rate DESC LIMIT 5",
+                    (version,)
+                ).fetchall()
+                top5 = "、".join([f"{r[0]}({r[1]:.1f}%)" for r in usage_rows]) if usage_rows else "暂未采集数据"
+
+                # 社区热度
+                hot_row = c.execute(
+                    "SELECT SUM(post_count), AVG(avg_reply_count) FROM community_hot WHERE version=?",
+                    (version,)
+                ).fetchone()
+                post_count = int(hot_row[0]) if hot_row and hot_row[0] else 0
+                avg_reply = f"{hot_row[1]:.1f}" if hot_row and hot_row[1] else "0"
+
+                # 风险项
+                risk_rows = c.execute(
+                    "SELECT r.title FROM risks r JOIN versions v ON r.version_id=v.id WHERE v.version=?",
+                    (version,)
+                ).fetchall()
+                risk_items = "；".join([r[0] for r in risk_rows]) if risk_rows else "暂无风险项"
+        except:
+            version = "未知"
+            top5 = "暂未采集"
+            post_count = 0
+            avg_reply = "0"
+            risk_items = "无"
+
+        community_activity = "活跃" if post_count > 1000 else ("一般" if post_count > 300 else "低迷")
+
+        return f"""你是一个游戏运营数据分析师。当前版本是 {version}。
+角色使用率排名（降序）：{top5}
+社区热度：{community_activity}（帖子数 {post_count}，平均回复 {avg_reply}）
+存在的风险项：{risk_items}
+请分析：
+1. 该版本运营状况如何？是否存在需要关注的问题？
+2. 针对使用率下降的角色，给出至少2条运营优化建议（活动、剧情、数值调整等）。
+3. 基于社区热度，建议是否需要加强社区互动活动。
+保持回答简洁，不超过300字。"""

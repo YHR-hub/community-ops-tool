@@ -1,0 +1,10 @@
+database_path: "data/ops_data.db"
+deepseek_api_key: "sk-your-key-here"
+deepseek_model: "deepseek-chat"
+deepseek_base_url: "https://api.deepseek.com"
+ai_timeout: 10
+demo_mode: false
+log_level: "INFO"
+log_file: "app.log"
+theme_color: "#ff4d6a"
+paimon_api_url: "https://paimon.moe/api/abyss"
