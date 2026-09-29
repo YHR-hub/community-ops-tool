@@ -15,6 +15,9 @@ v4.5 新增：
 v4.6 新增：
   library   文库     —— Obsidian 式知识库浏览器（双链/反链/搜索）
 
+v4.7 新增：
+  content   内容     —— 内容运营工作台（作品库/发布数据/形式实验）
+
 旧版视图已废弃：dashboard.py / ai.py / plans.py（能力已并入上表）。
 """
 
@@ -25,6 +28,7 @@ from .analysis import AnalysisMixin
 from .report import ReportMixin
 from .industry import IndustryMixin
 from .library import LibraryMixin
+from .content import ContentMixin
 
 __all__ = [
     "OverviewMixin",
@@ -34,4 +38,5 @@ __all__ = [
     "ReportMixin",
     "IndustryMixin",
     "LibraryMixin",
+    "ContentMixin",
 ]

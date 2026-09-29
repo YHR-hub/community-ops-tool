@@ -262,6 +262,26 @@ CREATE TABLE IF NOT EXISTS insight_cases (
     takeaway  TEXT DEFAULT '',               -- 可迁移的启示
     source    TEXT DEFAULT ''
 );
+
+-- ═══ v4.7 内容运营（把"运营工具"用在真实在运营的事上）═══
+-- 设计动机：工具真实使用痕迹显示，用户真正在做的是"内容发布与数据追踪"
+-- （此前用 activity_log 凑合记录）。这张表把它变成一等数据：
+-- 每条内容 = 平台 × 形式 × 标题，追踪浏览/互动/复盘，支撑"形式实验对比"。
+CREATE TABLE IF NOT EXISTS content_posts (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform     TEXT NOT NULL DEFAULT '知乎',   -- 知乎/公众号/米游社/其他
+    form         TEXT NOT NULL DEFAULT '文章',   -- 文章/回答/想法/短内容
+    title        TEXT NOT NULL,
+    series_no    INTEGER,                        -- 系列篇号（可空）
+    url          TEXT DEFAULT '',
+    status       TEXT NOT NULL DEFAULT '待发布', -- 待发布/已发布/已归档
+    publish_date TEXT,
+    views        INTEGER DEFAULT 0,
+    likes        INTEGER DEFAULT 0,
+    comments     INTEGER DEFAULT 0,
+    review       TEXT DEFAULT '',                -- 复盘一句话
+    update_time  TEXT DEFAULT (datetime('now','localtime'))
+);
 """
 
 # 索引 —— 按实际查询路径设计，不是无脑加
@@ -282,6 +302,8 @@ INDEXES = [
     ("idx_industry_date", "industry_events(date)"),
     ("idx_industry_cat", "industry_events(category)"),
     ("idx_comp_month", "competitor_revenue(month)"),
+    ("idx_content_status", "content_posts(status)"),
+    ("idx_content_date", "content_posts(publish_date)"),
 ]
 
 # 唯一约束 —— 必须单独建 UNIQUE INDEX，不能只写在 CREATE TABLE 里。
@@ -296,6 +318,7 @@ UNIQUE_INDEXES = [
     ("ux_char_usage", "char_usage(version, character_name)"),
     ("ux_community", "community_hot(version, platform)"),
     ("ux_industry_event", "industry_events(date, title)"),
+    ("ux_content_post", "content_posts(platform, form, title)"),
 ]
 
 # 迁移：旧库缺的列，按 (表, 列, 定义) 声明
@@ -385,7 +408,8 @@ def db_stats():
     out = {}
     for t in ("versions", "daily_metrics", "events", "checklists", "reports",
               "budgets", "risks", "char_usage", "community_hot", "activity_log",
-              "industry_events", "competitor_revenue", "insight_cases"):
+              "industry_events", "competitor_revenue", "insight_cases",
+              "content_posts"):
         try:
             row = query(f"SELECT COUNT(*) AS n FROM {t}", one=True)
             out[t] = row["n"] if row else 0

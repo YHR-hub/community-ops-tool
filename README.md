@@ -7,7 +7,7 @@
 [![CI](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tests](https://img.shields.io/badge/tests-91%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-93%20passing-brightgreen)
 
 **[⬇ 下载 exe（Windows，免安装）](https://github.com/YHR-hub/community-ops-tool/releases/latest)**
 
@@ -34,7 +34,7 @@
 
 ## 功能模块
 
-七个主导航，一个能力只有一个入口。
+八个主导航，一个能力只有一个入口。
 
 | 模块 | 功能 |
 |------|------|
@@ -45,6 +45,7 @@
 | 报告 | 四段式智能报告、周期报表（周报/月报/季报，可导 CSV）、历史归档可查看可删除 |
 | **行业** | **行业事件时间线 / 竞品流水对比（图）/ 舆情案例卡**——与「行业知识库」目录联动的活数据层 |
 | **文库** | **Obsidian 式知识库浏览器**：文件树 / 双链跳转 / 反向链接 / 全文搜索 / vault 可切换 |
+| **内容** | **内容运营工作台**：内容作品库（发布数据追踪）/ 形式实验对比（文章 vs 回答）/ 系列进度 |
 
 ## 技术栈
 
@@ -101,7 +102,7 @@ python seed_demo.py --reset   # 清空全部业务数据
 
 ### 自测
 ```bash
-python smoke_test.py   # 57 项：页面渲染 + 弹窗 + 核心逻辑 + 布局不变量 + 异动确认 + 智能体
+python smoke_test.py   # 59 项：页面渲染 + 弹窗 + 核心逻辑 + 布局不变量 + 异动确认 + 智能体
 python flow_test.py    # 34 项：录入/导入/切换/标记/报告/早报闭环 完整流程
 python capture.py      # 14 张截图，用于肉眼验收（画面被遮挡时会跳过而非存错图）
 
@@ -109,7 +110,7 @@ pytest tests/ -m "not gui"   # 纯逻辑用例（异动确认/动作映射/归�
 ```
 
 三个 CI job 各管一段：`lint`（ruff，ubuntu）→ `fast-test`（pytest 纯逻辑，ubuntu，秒级）
-→ `smoke-test`（GUI 全量 91 项，Windows runner）。分层是为了让 PR 上先红的永远是
+→ `smoke-test`（GUI 全量 93 项，Windows runner）。分层是为了让 PR 上先红的永远是
 最快、最便宜的那一个。
 
 ### 自行打包
@@ -242,7 +243,7 @@ CSV 解析 + 列名映射 + 逐行校验原本全写在 `views/data.py` 里，
 - **ruff**：渐进策略（先只开 F/E4/E7/E9），清掉 87 处存量问题，CI 独立 lint job；
 - **pytest 适配层**（`tests/test_ops.py`）：既有脚本当整体用例跑（中文明细一条不丢），
   另加 6 个纯逻辑用例秒级反馈——异动确认、动作映射、归因分派、数据源归一化；
-- **CI 三层**：`lint`（ubuntu）→ `fast-test`（ubuntu，秒级）→ `smoke-test`（Windows GUI 全量 91 项），
+- **CI 三层**：`lint`（ubuntu）→ `fast-test`（ubuntu，秒级）→ `smoke-test`（Windows GUI 全量 93 项），
   让 PR 上先红的永远是最快最便宜的那个；
 - **Release 自动化**：推送 `v*` tag 即触发打包 → exe 冒烟（确认 exe 旁生成 `data/ops_data.db`，
   防止 onefile 路径 bug 复发）→ 自动建 Release 挂 exe；
@@ -252,7 +253,26 @@ CSV 解析 + 列名映射 + 逐行校验原本全写在 `views/data.py` 里，
 ### 明确不做的事
 
 架构重写。Mixin 分层在 9k 行规模是合理的，拆 repository/domain 层是过度设计，
-还会把已经跑通的 91 项测试全部打乱。
+还会把已经跑通的 93 项测试全部打乱。
+
+## v4.7 内容：把工具用在真实在运营的事上
+
+一次数据盘点暴露的问题：工具设计给「运营一款游戏」，但  是 **0 行**——
+因为使用者没有游戏可运营。而真实产生的数据（内容发布、行业观察）全挤在操作日志里。
+
+**方向由此反转：从「模拟运营游戏」转向「运营自己真实在做的事」。**
+
+### 内容运营工作台（第 8 个导航）
+
+- **内容作品库**：每条内容 = 平台 × 形式 × 标题，追踪浏览/互动/状态/复盘
+- **形式实验对比**：按形式聚合平均浏览——同一系列「文章 vs 回答」的真实分发实验
+- **系列进度**：8 篇内容系列一览（已发布/待发布/待写 + 浏览数）
+
+### 为什么这版重要
+
+它不是「又加了一个功能」，是**定位的修正**：
+工具的价值不在于它看起来像什么，而在于**它真的在被使用**——
+这一页的数据来自真实发布（知乎 11 浏览的那篇，已经在库里了）。
 
 ## v4.6 文库：把知识库变成 Obsidian 式的工作台
 

@@ -78,9 +78,9 @@ def main():
         traceback.print_exc(limit=8)
         return
 
-    print("\n=== 2. 七个主页面渲染 ===")
+    print("\n=== 2. 八个主页面渲染 ===")
     for key in ("overview", "data", "versions", "analysis", "report",
-                "industry", "library"):
+                "industry", "library", "content"):
         def go(k=key):
             app.show_view(k)
             app.update()
@@ -605,6 +605,29 @@ def main():
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
     check("文库页（双链 / 反链 / 搜索）", library_wikilinks_and_search)
+
+    # ── v4.7：内容页 ──
+    def content_page_with_data():
+        """内容页：录入 → 渲染（含 KPI/系列/表格）→ 字段校验 → 清理。"""
+        db.execute(
+            "INSERT OR REPLACE INTO content_posts "
+            "(platform, form, title, series_no, status, publish_date, views, "
+            "likes, comments, review) "
+            "VALUES ('其他','文章','【测试】内容记录',8,'已发布','2026-09-01',"
+            "123,5,2,'测试复盘')")
+        try:
+            app.show_content()
+            app.update()
+            app.update_idletasks()
+            row = db.query(
+                "SELECT views, likes, series_no, status FROM content_posts "
+                "WHERE title='【测试】内容记录'", one=True)
+            assert row is not None, "插入的内容应能查到"
+            assert row["views"] == 123 and row["likes"] == 5, "字段值应正确"
+            assert row["series_no"] == 8 and row["status"] == "已发布"
+        finally:
+            db.execute("DELETE FROM content_posts WHERE title LIKE '【测试】%'")
+    check("内容页（录入/渲染/KPI）", content_page_with_data)
 
     print("\n=== 9. AI 离线兜底（不配 Key）===")
     def offline_ai():
