@@ -629,6 +629,18 @@ def main():
             db.execute("DELETE FROM content_posts WHERE title LIKE '【测试】%'")
     check("内容页（录入/渲染/KPI）", content_page_with_data)
 
+    # ── v4.8：窗口几何守卫（防迷你窗口 bug 复发）──
+    def geometry_guard():
+        """坏几何值被拒绝、正常值放行——曾出现 160x160 存库导致迷你窗口。"""
+        from main import _valid_geometry
+        assert not _valid_geometry("160x160+160+160"), "迷你尺寸应被拒绝"
+        assert not _valid_geometry("800x500+0+0"), "低于最小可用尺寸应被拒绝"
+        assert _valid_geometry("1280x820+100+100"), "正常尺寸应放行"
+        assert _valid_geometry("1920x1080"), "无位置部分也应放行"
+        assert not _valid_geometry("garbage"), "坏格式应被拒绝"
+        assert not _valid_geometry(""), "空值应被拒绝（走默认几何）"
+    check("窗口几何守卫（v4.8 防迷你窗口）", geometry_guard)
+
     print("\n=== 9. AI 离线兜底（不配 Key）===")
     def offline_ai():
         app._analysis_tab = "ai"

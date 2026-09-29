@@ -38,6 +38,21 @@ from views import (OverviewMixin, DataMixin, VersionsMixin,
                    ContentMixin)
 
 APP_VERSION = "4.7"
+
+
+def _valid_geometry(geo):
+    """校验保存的窗口几何是否可用（v4.8 修复）。
+
+    背景：曾出现 config 存入 "160x160+160+160" 的坏值，
+    启动时被无条件还原 → 应用以迷你窗口打开、几乎不可用。
+    防御：宽高低于最小可用尺寸（900x600）一律拒绝，回退默认 1280x820。
+    """
+    try:
+        size = str(geo).split("+")[0].split("-")[0]
+        w, h = (int(v) for v in size.lower().split("x"))
+        return w >= 900 and h >= 600
+    except Exception:
+        return False
 APP_TITLE = "米游社运营助手"
 
 ctk.set_appearance_mode("dark")
@@ -150,7 +165,7 @@ class App(OverviewMixin, DataMixin, VersionsMixin, AnalysisMixin, ReportMixin,
         self._build_main()
 
         saved_geo = load_config("win_geometry")
-        if saved_geo:
+        if saved_geo and _valid_geometry(saved_geo):
             try:
                 self.geometry(saved_geo)
             except Exception:

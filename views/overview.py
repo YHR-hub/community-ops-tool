@@ -20,14 +20,14 @@ from theme import (
     PRIMARY, PRIMARY_HOVER, DANGER, SUCCESS, WARNING, INFO, AI, NEUTRAL,
     TEXT_PRIMARY, TEXT_BODY, TEXT_SECONDARY, TEXT_TERTIARY,
     font, SIZE_H3, SIZE_BODY, SIZE_SMALL, SIZE_TINY,
-    SP_XS, SP_SM, SP_MD, SP_LG, RADIUS_MD,
+    SP_XS, SP_SM, SP_MD, SP_LG, RADIUS_MD, RADIUS_SM,
 )
 import icons
 import components as C
 import charts
 from db import (
     metrics_between, latest_version, task_progress, open_risks, date_str, days_ago, parse_date, retention_stats,
-    anomaly_report, query,
+    anomaly_report, query, load_config,
 )
 
 # 指标异常判定阈值（抽成常量，不再散落在各处）
@@ -568,6 +568,18 @@ class OverviewMixin:
         ctk.CTkLabel(card.body, text=b["narrative"], font=font(SIZE_BODY),
                      text_color=TEXT_BODY, anchor="w", wraplength=560,
                      justify="left").pack(anchor="w", padx=SP_LG, pady=SP_MD)
+
+        # v4.8：无 AI Key 时给出明确引导（不再静默降级为规则模式）
+        if not b.get("ai_polished") and not load_config("ai_api_key"):
+            tip = ctk.CTkFrame(scroll, fg_color=BG_ELEVATED, corner_radius=RADIUS_SM)
+            tip.pack(fill="x", pady=(0, SP_MD))
+            ctk.CTkLabel(
+                tip,
+                text="未配置 AI Key，当前为「规则模式」生成（内容完整，仅表达为模板拼装）。"
+                     "配置后可用大模型润色 → 分析页 › AI 顾问 设置",
+                font=font(SIZE_TINY), text_color=TEXT_TERTIARY,
+                anchor="w", wraplength=560, justify="left").pack(
+                anchor="w", padx=SP_MD, pady=SP_SM)
 
         # 预警
         if b["alerts"]:

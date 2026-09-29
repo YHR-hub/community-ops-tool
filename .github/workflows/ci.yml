@@ -19,6 +19,9 @@ jobs:
       - name: Run ruff (F + E4/E7/E9, config in ruff.toml)
         run: ruff check . --output-format=github
 
+      - name: Check test count consistency (anti-drift guard, v4.8)
+        run: python3 tools/check_test_count.py
+
   fast-test:
     # 纯逻辑用例：不启动 GUI，秒级反馈（PR 上先红的是它）
     runs-on: ubuntu-latest
@@ -64,5 +67,5 @@ jobs:
       - name: Run flow tests (34 items, seeds v3.8 demo data first)
         run: python flow_test.py --force
 
-      - name: Run smoke tests (40 items, incl. layout invariants)
+      - name: Run smoke tests (60 items, incl. layout invariants)
         run: python smoke_test.py
