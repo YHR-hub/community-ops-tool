@@ -641,6 +641,34 @@ def main():
         assert not _valid_geometry(""), "空值应被拒绝（走默认几何）"
     check("窗口几何守卫（v4.8 防迷你窗口）", geometry_guard)
 
+    # ── v4.8：演示数据标注（真假不混淆）──
+    def demo_badge_flow():
+        """演示标记 -> 数据/总览页带角标渲染 -> 真实录入后标记清除。"""
+        db.execute("INSERT OR REPLACE INTO config(key,value) "
+                   "VALUES('demo_data','1')")
+        try:
+            app.show_view("data")
+            app.update()
+            app.update_idletasks()
+            app.show_view("overview")
+            app.update()
+            app.update_idletasks()
+            # 回到 data 页（确保其组件存活）再模拟一次真实录入
+            app.show_view("data")
+            app.update()
+            app.update_idletasks()
+            app._insert_metric({
+                "date": "2026-01-01", "game": "崩坏：星穹铁道",
+                "dau": 1, "new_users": 1, "new_posts": 1, "comments": 1,
+                "avg_session": 1.0, "interaction_rate": 1.0,
+                "retention_1": 1.0, "retention_7": 1.0, "retention_30": 1.0})
+            assert db.load_config("demo_data") == "0", "真实录入后应清除演示标记"
+        finally:
+            db.execute("DELETE FROM daily_metrics WHERE date='2026-01-01'")
+            db.execute("INSERT OR REPLACE INTO config(key,value) "
+                       "VALUES('demo_data','0')")
+    check("演示数据标注（v4.8）", demo_badge_flow)
+
     print("\n=== 9. AI 离线兜底（不配 Key）===")
     def offline_ai():
         app._analysis_tab = "ai"

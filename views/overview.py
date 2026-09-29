@@ -27,7 +27,7 @@ import components as C
 import charts
 from db import (
     metrics_between, latest_version, task_progress, open_risks, date_str, days_ago, parse_date, retention_stats,
-    anomaly_report, query, load_config,
+    anomaly_report, query, load_config, save_config,
 )
 
 # 指标异常判定阈值（抽成常量，不再散落在各处）
@@ -66,6 +66,8 @@ class OverviewMixin:
             bar.pack(fill="x", pady=(0, SP_MD))
             ctk.CTkLabel(bar, text=warm, font=font(SIZE_SMALL),
                          text_color=TEXT_SECONDARY, anchor="w").pack(side="left")
+            if load_config("demo_data") == "1":   # v4.8：真假数据标注
+                C.Badge(bar, "演示数据", WARNING).pack(side="left", padx=(SP_SM, 0))
             # v4.2：早报智能体入口 —— 感知/决策/行动/产出见 agent.py
             ctk.CTkButton(bar, text="生成今日早报", width=132, height=30,
                           font=font(SIZE_SMALL, bold=True),
@@ -481,6 +483,7 @@ class OverviewMixin:
         try:
             import seed_demo
             n = seed_demo.seed(force=False)
+            save_config("demo_data", "1")   # v4.8：标注演示模式
             self.toast(f"已载入演示数据（{n} 条记录）")
             self.log("载入演示数据")
             self._render_current_version()

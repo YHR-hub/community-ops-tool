@@ -35,7 +35,7 @@ import charts
 import db
 from db import (
     GAMES, query, execute, get_versions, top_characters, latest_version,
-    date_str, safe_int, safe_float, valid_date,
+    date_str, safe_int, safe_float, valid_date, load_config, save_config,
 )
 
 # CSV 表头 → 数据库列名。允许中文表头，降低使用门槛。
@@ -83,6 +83,14 @@ class DataMixin:
         body, _page = self.page_scaffold(
             "data", "数据", "录入每日指标、批量导入、维护角色与社区数据",
             icon="chart", refresh=self._build_data)
+
+        if load_config("demo_data") == "1":   # v4.8：演示数据标注
+            demo_bar = ctk.CTkFrame(body, fg_color="transparent", height=1)
+            demo_bar.pack(fill="x", pady=(0, SP_SM))
+            C.Badge(demo_bar, "演示数据", WARNING).pack(side="left")
+            ctk.CTkLabel(demo_bar, text="当前展示约定为功能体验数据，录入真实数据后自动取消标注",
+                         font=font(SIZE_TINY), text_color=TEXT_TERTIARY).pack(
+                side="left", padx=(SP_SM, 0))
 
         self._data_filter = ctk.CTkFrame(body, fg_color="transparent", height=1)
         self._data_filter.pack(fill="x", pady=(0, SP_MD))
@@ -276,6 +284,7 @@ class DataMixin:
             pass
 
     def _insert_metric(self, rec, overwrite_id=None):
+        save_config("demo_data", "0")   # v4.8：录入真实数据 → 退出演示标注
         # 用 rec.get() 而不是 rec[]：调用方可能只传部分字段（如仅改 DAU 的
         # 批量修正），缺的按 0 落库。v4.1 前这里直接下标取值，flow_test 的
         # 部分字段用例一进来就 KeyError 被 except 吞掉，覆盖变成了假成功。

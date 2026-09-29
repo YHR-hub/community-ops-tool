@@ -64,7 +64,7 @@ def _run(script, *args):
 
 @pytest.mark.gui
 def test_smoke_suite():
-    """渲染冒烟 60 项：页面/弹窗/核心逻辑/布局不变量/早报智能体。"""
+    """渲染冒烟 61 项：页面/弹窗/核心逻辑/布局不变量/早报智能体。"""
     code, out = _run("smoke_test.py")
     print(out)
     assert code == 0, "smoke_test 存在失败项，见上方明细"

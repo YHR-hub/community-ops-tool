@@ -1,4 +1,4 @@
-# 米游社运营助手 (miHoYo Community Ops Tool) v4.2
+# 米游社运营助手 (miHoYo Community Ops Tool) v4.8
 
 <div align="center">
 
@@ -7,13 +7,15 @@
 [![CI](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml/badge.svg)](https://github.com/YHR-hub/community-ops-tool/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Tests](https://img.shields.io/badge/tests-94%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-95%20passing-brightgreen)
 
 **[⬇ 下载 exe（Windows，免安装）](https://github.com/YHR-hub/community-ops-tool/releases/latest)**
 
 </div>
 
-游戏社区运营全流程管理桌面工具，面向米哈游系产品（原神 · 崩铁 · 绝区零 · 崩坏3）的日常运营工作。
+游戏运营**情报与内容**工作台：**行业情报监测**（事件/竞品/案例卡）+ **内容运营追踪**（发布数据/形式实验/系列进度）+ 数据与报告。
+
+> 定位说明（v4.8）：主线数据来自**真实的行业跟踪与内容运营**；「数据/版本/分析」中的模拟运营能力保留为**能力演示**（载入演示数据时界面会明确标注，避免真假混淆）。
 
 > **v4.2 是早报智能体版**：在 v4.1 数据能力（留存分析 + 异动归因）之上，
 > 新增**早报智能体**——感知 → 决策 → 产出的可解释智能体，一键把今天的晨会开了。
@@ -102,7 +104,7 @@ python seed_demo.py --reset   # 清空全部业务数据
 
 ### 自测
 ```bash
-python smoke_test.py   # 60 项：页面渲染 + 弹窗 + 核心逻辑 + 布局不变量 + 异动确认 + 智能体
+python smoke_test.py   # 61 项：页面渲染 + 弹窗 + 核心逻辑 + 布局不变量 + 异动确认 + 智能体
 python flow_test.py    # 34 项：录入/导入/切换/标记/报告/早报闭环 完整流程
 python capture.py      # 14 张截图，用于肉眼验收（画面被遮挡时会跳过而非存错图）
 
@@ -110,7 +112,7 @@ pytest tests/ -m "not gui"   # 纯逻辑用例（异动确认/动作映射/归�
 ```
 
 三个 CI job 各管一段：`lint`（ruff，ubuntu）→ `fast-test`（pytest 纯逻辑，ubuntu，秒级）
-→ `smoke-test`（GUI 全量 94 项，Windows runner）。分层是为了让 PR 上先红的永远是
+→ `smoke-test`（GUI 全量 95 项，Windows runner）。分层是为了让 PR 上先红的永远是
 最快、最便宜的那一个。
 
 ### 自行打包
@@ -243,7 +245,7 @@ CSV 解析 + 列名映射 + 逐行校验原本全写在 `views/data.py` 里，
 - **ruff**：渐进策略（先只开 F/E4/E7/E9），清掉 87 处存量问题，CI 独立 lint job；
 - **pytest 适配层**（`tests/test_ops.py`）：既有脚本当整体用例跑（中文明细一条不丢），
   另加 6 个纯逻辑用例秒级反馈——异动确认、动作映射、归因分派、数据源归一化；
-- **CI 三层**：`lint`（ubuntu）→ `fast-test`（ubuntu，秒级）→ `smoke-test`（Windows GUI 全量 94 项），
+- **CI 三层**：`lint`（ubuntu）→ `fast-test`（ubuntu，秒级）→ `smoke-test`（Windows GUI 全量 95 项），
   让 PR 上先红的永远是最快最便宜的那个；
 - **Release 自动化**：推送 `v*` tag 即触发打包 → exe 冒烟（确认 exe 旁生成 `data/ops_data.db`，
   防止 onefile 路径 bug 复发）→ 自动建 Release 挂 exe；
@@ -253,7 +255,20 @@ CSV 解析 + 列名映射 + 逐行校验原本全写在 `views/data.py` 里，
 ### 明确不做的事
 
 架构重写。Mixin 分层在 9k 行规模是合理的，拆 repository/domain 层是过度设计，
-还会把已经跑通的 94 项测试全部打乱。
+还会把已经跑通的 95 项测试全部打乱。
+
+## v4.8 可信可用：先让工具「真实、可信、值得用」
+
+产品战略团队评审（数据/用户/竞品三线）发现：**工具宣称运营游戏，真实数据却全在行业与内容侧**
+（核心表 0 行空转）；且有一个刺眼缺陷——config 曾存坏几何值，应用会以 160×160 迷你窗口打开。
+这一版不新增花哨功能，只回答一个问题：**这个工具真实、可信、值得用吗？**
+
+- **迷你窗口修复**：几何守卫（低于 900×600 拒绝）+ 坏数据清理 + 冒烟验收用例
+- **AI 引导**：无 Key 时早报明确提示「规则模式 + 去分析页配置」，不再静默降级
+- **防漂移守卫**：（静态互检 +  实跑）接入 CI——
+  测试数从此自动校验，文档手写数字不一致直接拦红
+- **定位对齐**：主线明确为「行业情报 + 内容运营」；模拟运营能力标注为「能力演示」
+- **演示数据标注**：载入演示数据后，总览/数据页显示「演示数据」徽标，录入真实数据自动取消
 
 ## v4.7 内容：把工具用在真实在运营的事上
 

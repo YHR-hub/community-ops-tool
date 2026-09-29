@@ -67,5 +67,5 @@ jobs:
       - name: Run flow tests (34 items, seeds v3.8 demo data first)
         run: python flow_test.py --force
 
-      - name: Run smoke tests (60 items, incl. layout invariants)
+      - name: Run smoke tests (61 items, incl. layout invariants)
         run: python smoke_test.py
