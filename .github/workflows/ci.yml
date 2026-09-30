@@ -22,6 +22,10 @@ jobs:
       - name: Check test count consistency (anti-drift guard, v4.8)
         run: python3 tools/check_test_count.py
 
+      - name: Check version consistency (anti-drift guard, v4.8)
+        # v4.8 发版时 main.py 的 APP_VERSION 漏改，exe 界面显示 v4.7
+        run: python3 tools/check_version.py
+
   fast-test:
     # 纯逻辑用例：不启动 GUI，秒级反馈（PR 上先红的是它）
     runs-on: ubuntu-latest

@@ -21,6 +21,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Check APP_VERSION matches tag
+        # v4.8 教训：tag 打了 v4.8，main.py 的 APP_VERSION 还停在 4.7，
+        # 于是 Release 里的 exe 标题栏显示 v4.7。发版前先拦住。
+        run: python tools/check_version.py "${{ github.ref_name }}"
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -38,8 +43,12 @@ jobs:
 
       - name: Smoke check the built exe
         # 打包产物必须真的能启动：启动后 exe 旁会生成 data/ops_data.db
+        # v4.8.1 追加：再读 exe 自己写下的运行日志，确认日志里的版本号 == 本次 tag。
+        # 防的是「源码改对了、打出来的 exe 还是旧的」这类更隐蔽的漂移——
+        # v4.8 出事时，静态互检拦得住，但没人真的打开过那个包。
         shell: pwsh
         run: |
+          $ver = "${{ github.ref_name }}".TrimStart("v")
           $exe = "dist\米游社运营助手.exe"
           if (-not (Test-Path $exe)) { throw "打包产物缺失: $exe" }
           $p = Start-Process $exe -PassThru
@@ -47,7 +56,14 @@ jobs:
           $db = Test-Path "dist\data\ops_data.db"
           if ($p) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
           if (-not $db) { throw "exe 启动后未生成 data/ops_data.db（frozen 路径失效）" }
-          Write-Host "exe 冒烟通过"
+          $log = "dist\logs\ops_tool.log"
+          if (-not (Test-Path $log)) { throw "exe 未写运行日志: $log" }
+          if (-not (Select-String -Path $log -Pattern "启动 v$ver" -Quiet)) {
+            Write-Host "--- 运行日志末尾 ---"
+            Get-Content $log -Tail 5
+            throw "运行日志里没有 v$ver：打包产物版本号与 tag 不一致"
+          }
+          Write-Host "exe 冒烟通过（实机确认版本号 v$ver）"
 
       - name: Rename artifact (ASCII-safe for upload)
         # 中文文件名在 runner 的编码环境下会被 gh 弄成 default.exe，先改名规避

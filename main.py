@@ -37,7 +37,7 @@ from views import (OverviewMixin, DataMixin, VersionsMixin,
                    AnalysisMixin, ReportMixin, IndustryMixin, LibraryMixin,
                    ContentMixin)
 
-APP_VERSION = "4.7"
+APP_VERSION = "4.8.1"  # 唯一真源：标题栏/底栏/启动日志都读它（CI 由 tools/check_version.py 校验）
 
 
 def _valid_geometry(geo):
